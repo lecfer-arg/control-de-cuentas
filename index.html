@@ -345,7 +345,7 @@
 <body>
 
 <div class="topbar">
-  <span class="version-badge">V3</span>
+  <span class="version-badge">V4</span>
   <div class="topbar-inner">
     <div class="brand-mark">
       <div class="glyph">CC</div>
@@ -1340,7 +1340,11 @@
   // ---------- Config por defecto ----------
   (function setDefaults() {
     const today = new Date();
-    $('cfg-lasteval').value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+    // Mes anterior al actual
+    let y = today.getFullYear();
+    let m = today.getMonth(); // 0-based: getMonth() ya es "mes actual - 1" en índice 0..11
+    if (m === 0) { m = 12; y -= 1; } // enero -> diciembre del año anterior
+    $('cfg-lasteval').value = `${y}-${String(m).padStart(2, '0')}`;
   })();
 
   function updateAnalizarState() {
