@@ -373,6 +373,9 @@
           <span class="meta" id="cuentas-meta"></span>
           <button class="remove" id="cuentas-remove">Quitar</button>
         </div>
+        <div id="cond-warning" style="display:none; margin-top:14px; padding:12px 14px; background:rgba(162,59,46,0.10); border:1px solid rgba(162,59,46,0.35); border-radius:3px; font-size:13px; color:var(--stamp-red-dark);">
+          ⚠ No se detectó automáticamente una pestaña de condiciones. <strong>Sin elegirla, la cuota mínima se calculará en $0 para todos los clientes.</strong> Seleccioná la pestaña correcta abajo.
+        </div>
         <div class="field" style="margin-top:16px;">
           <label class="field-label">Pestaña de condiciones</label>
           <select id="sel-condiciones"></select>
@@ -838,9 +841,10 @@
     const cantViajes = dins.length;
     const totalPagadoGlobal = sumWhere(grpFilt, 'HABER', ['REC', 'RSC']);
 
+    const cinfoGrupo = (config.condDict && config.condDict[String(cuGrupo)]) || {};
     let cuotaDef, señaDef;
     if (excepcionesCliente[cod] !== undefined) { cuotaDef = excepcionesCliente[cod]; señaDef = excepcionesCliente[cod]; }
-    else { cuotaDef = 0; señaDef = 0; }
+    else { cuotaDef = cinfoGrupo.cuotaMin || 0; señaDef = cinfoGrupo.señaMin || cuotaDef; }
 
     function base(estado, obs, opts = {}) {
       return {
@@ -1088,8 +1092,14 @@
   }
 
   function guessCondSheet(sheetNames) {
-    if (sheetNames.includes('CONDICIONES')) return 'CONDICIONES';
-    if (sheetNames.includes('OBSERVACIONES')) return 'OBSERVACIONES';
+    const norm = (s) => String(s).trim().toUpperCase();
+    const targets = ['CONDICIONES', 'OBSERVACIONES', 'CONDICION', 'CONDICIONES DE PAGO', 'OBSERVACION'];
+    for (const t of targets) {
+      const found = sheetNames.find(n => norm(n) === t);
+      if (found) return found;
+    }
+    // Heurística de respaldo: buscar una pestaña sin columna COD_CLI que tenga
+    // al menos 2 columnas de texto (probable pestaña de condiciones con otro nombre)
     return null;
   }
 
@@ -1170,6 +1180,24 @@
     const totalCli = state.cuentasSheets.reduce((a, s) => a + new Set(s.rows.map(r => String(r.COD_CLI).trim())).size, 0);
     $('cuentas-meta').textContent = `${state.cuentasSheets.length} pestañas · ~${totalCli} clientes`;
 
+    const condCountEl = $('cond-count') || (function () {
+      const hint = document.querySelector('#sel-condiciones').parentElement.querySelector('.field-hint');
+      const p = document.createElement('div');
+      p.id = 'cond-count';
+      p.className = 'field-hint';
+      p.style.fontWeight = '600';
+      hint.parentElement.insertBefore(p, hint);
+      return p;
+    })();
+    if (state.condRaw.length > 0) {
+      condCountEl.style.color = 'var(--pine)';
+      condCountEl.textContent = `✓ ${state.condRaw.length} grupos con condición cargados desde "${state.condSheetName}"`;
+    } else {
+      condCountEl.style.color = 'var(--stamp-red)';
+      condCountEl.textContent = `⚠ No se cargó ninguna condición — todas las cuotas mínimas darán 0. Elegí la pestaña correcta abajo.`;
+    }
+    $('cond-warning').style.display = state.condSheetName ? 'none' : 'block';
+
     const sel = $('sel-condiciones');
     sel.innerHTML = '';
     const optNone = el('option', null, 'Ninguna (sin condiciones)'); optNone.value = '';
@@ -1182,6 +1210,17 @@
     sel.onchange = () => {
       state.condSheetName = sel.value || null;
       state.condRaw = state.condSheetName ? loadCondRaw(state.cuentasWb.Sheets[state.condSheetName]) : [];
+      $('cond-warning').style.display = state.condSheetName ? 'none' : 'block';
+      const cc = $('cond-count');
+      if (cc) {
+        if (state.condRaw.length > 0) {
+          cc.style.color = 'var(--pine)';
+          cc.textContent = `✓ ${state.condRaw.length} grupos con condición cargados desde "${state.condSheetName}"`;
+        } else {
+          cc.style.color = 'var(--stamp-red)';
+          cc.textContent = `⚠ No se cargó ninguna condición — todas las cuotas mínimas darán 0. Elegí la pestaña correcta abajo.`;
+        }
+      }
       state.cuentasSheets = state.cuentasWb.SheetNames
         .filter(n => n !== state.condSheetName)
         .map(n => {
@@ -1308,7 +1347,17 @@
 
   // ---------- Analizar ----------
 
-  $('btn-analizar').addEventListener('click', runAnalysis);
+  $('btn-analizar').addEventListener('click', () => {
+    if (!state.condSheetName) {
+      const proceed = confirm(
+        'No elegiste una pestaña de condiciones.\n\n' +
+        'Sin ella, la cuota mínima de TODOS los clientes se calculará como $0, lo que puede marcar a todos como "al día" incorrectamente.\n\n' +
+        '¿Seguro que querés continuar sin condiciones?'
+      );
+      if (!proceed) return;
+    }
+    runAnalysis();
+  });
 
   function buildConfig() {
     const corteVal = $('cfg-corte').value;
@@ -1492,6 +1541,21 @@
         cg.appendChild(card);
       });
       panel.appendChild(cg);
+
+      // diagnóstico: clientes activos con cuota mínima en 0 (posible condición no encontrada)
+      const activosSinCuota = data.results.filter(r =>
+        (r.estado === 'AL DIA' || r.estado === 'DADO DE BAJA') && (!r.cuotaMin || r.cuotaMin === 0)
+      );
+      if (activosSinCuota.length > 0) {
+        const pctSinCuota = activosSinCuota.length / Math.max(data.results.length, 1);
+        const warn = el('div');
+        warn.style.cssText = 'margin-bottom:16px; padding:10px 14px; border-radius:3px; font-size:12.5px; background:rgba(184,134,43,0.12); border:1px solid rgba(184,134,43,0.35); color:#8A6412;';
+        warn.textContent = `⚠ ${activosSinCuota.length} de ${data.results.length} clientes activos tienen Cuota Mínima en 0. `
+          + (pctSinCuota > 0.3
+            ? 'Revisá que la pestaña de condiciones esté bien elegida y que el código de grupo coincida entre ambas pestañas.'
+            : 'Puede ser normal si esos grupos no tienen cuota mínima definida, o revisá sus condiciones puntuales.');
+        panel.appendChild(warn);
+      }
 
       // validation
       if (data.validation) {
