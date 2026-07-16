@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Libro de Control — Conciliación de Cuentas</title>
+<title>CONTROL DE CUENTAS</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -93,6 +93,13 @@
     font-size: 12px; color: #8FA898; display: flex; align-items: center; gap: 6px; white-space: nowrap;
   }
   .topbar .privacy-note .dot { width: 6px; height: 6px; border-radius: 50%; background: #6FBF8F; box-shadow: 0 0 0 3px rgba(111,191,143,0.18); }
+
+  .version-badge {
+    position: absolute; top: 10px; right: 16px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; font-weight: 500;
+    color: #8FA898; border: 1px solid #3A4E43; border-radius: 999px;
+    padding: 2px 9px; letter-spacing: 0.03em;
+  }
 
   /* ---------- Layout ---------- */
   .wrap { max-width: 1180px; margin: 0 auto; padding: 34px 24px 90px; }
@@ -338,12 +345,13 @@
 <body>
 
 <div class="topbar">
+  <span class="version-badge">V3</span>
   <div class="topbar-inner">
     <div class="brand-mark">
-      <div class="glyph">LC</div>
+      <div class="glyph">CC</div>
       <div>
-        <h1>Libro de Control</h1>
-        <p>Conciliación de cuentas — Viajes de egresados</p>
+        <h1>Control de Cuentas</h1>
+        <p>Control de clientes por sucursal</p>
       </div>
     </div>
     <div class="privacy-note"><span class="dot"></span> Todo el análisis corre en tu navegador — los archivos no se envían a ningún servidor</div>
@@ -425,15 +433,10 @@
       <h2>Parámetros de control</h2>
     </div>
     <div class="step-body">
-      <div class="grid-3">
+      <div class="grid-2">
         <div class="field">
           <label class="field-label">Nombre del informe</label>
           <input type="text" id="cfg-nombre" value="Cuentas" placeholder="Ej: Tucumán, Salta..." />
-        </div>
-        <div class="field">
-          <label class="field-label">Fecha de corte (opcional)</label>
-          <input type="date" id="cfg-corte" />
-          <div class="field-hint">Vacío = usar todos los comprobantes del archivo, sin cortar fecha.</div>
         </div>
         <div class="field">
           <label class="field-label">Mes de evaluación</label>
@@ -1360,10 +1363,8 @@
   });
 
   function buildConfig() {
-    const corteVal = $('cfg-corte').value;
-    const fechaCorte = corteVal ? new Date(Date.UTC(+corteVal.slice(0,4), +corteVal.slice(5,7) - 1, +corteVal.slice(8,10))) : null;
-    // fecha corte es EXCLUYENTE: si el usuario elige un día, incluir ese día completo -> sumamos 1 día
-    const fechaCorteExclusiva = fechaCorte ? new Date(fechaCorte.getTime() + 86400000) : null;
+    // Sin fecha de corte: siempre se usan todos los comprobantes del archivo.
+    const fechaCorteExclusiva = null;
 
     const levVal = $('cfg-lasteval').value; // "YYYY-MM"
     const lastEval = levVal ? [+levVal.slice(0,4), +levVal.slice(5,7)] : (() => { const d = new Date(); return [d.getFullYear(), d.getMonth()+1]; })();
