@@ -345,7 +345,7 @@
 <body>
 
 <div class="topbar">
-  <span class="version-badge">V4</span>
+  <span class="version-badge">V5</span>
   <div class="topbar-inner">
     <div class="brand-mark">
       <div class="glyph">CC</div>
@@ -360,10 +360,43 @@
 
 <div class="wrap">
 
-  <!-- PASO 1: CUENTAS -->
-  <div class="step" id="step1">
+  <!-- PASO 1: CONDICIONES -->
+  <div class="step" id="step-cond">
     <div class="step-head">
       <div class="step-num">1</div>
+      <h2>Archivo de condiciones</h2>
+      <div class="sub">Con una pestaña por provincia</div>
+    </div>
+    <div class="step-body">
+      <div class="dropzone" id="dz-condiciones">
+        <div class="dz-icon">📑</div>
+        <div class="dz-title">Arrastrá el Excel de condiciones o hacé clic para elegirlo</div>
+        <div class="dz-sub">Una pestaña por provincia (ej: TUCUMAN, SALTA, JUJUY, CATAMARCA), con columnas Código de grupo, Nombre de grupo y Condición</div>
+        <input type="file" id="file-condiciones" accept=".xlsx,.xls" />
+      </div>
+      <div id="condiciones-loaded" style="display:none;">
+        <div class="file-chip">
+          <span>📄</span>
+          <span class="name" id="condiciones-filename"></span>
+          <span class="meta" id="condiciones-meta"></span>
+          <button class="remove" id="condiciones-remove">Quitar</button>
+        </div>
+        <div class="field" style="margin-top:16px;">
+          <label class="field-label">Provincia a utilizar</label>
+          <select id="sel-provincia"></select>
+          <div class="field-hint">Elegí la pestaña que corresponde al archivo de cuentas que vas a analizar.</div>
+        </div>
+      </div>
+      <div class="field-hint" style="margin-top:14px;">
+        ¿No tenés un archivo de condiciones separado? No hay problema — si el archivo de cuentas trae su propia pestaña CONDICIONES u OBSERVACIONES, la vamos a usar automáticamente en el paso siguiente.
+      </div>
+    </div>
+  </div>
+
+  <!-- PASO 2: CUENTAS -->
+  <div class="step" id="step1">
+    <div class="step-head">
+      <div class="step-num">2</div>
       <h2>Archivo de cuentas a analizar</h2>
       <div class="sub" id="step1-sub"></div>
     </div>
@@ -371,7 +404,7 @@
       <div class="dropzone" id="dz-cuentas">
         <div class="dz-icon">📂</div>
         <div class="dz-title">Arrastrá el Excel de cuentas o hacé clic para elegirlo</div>
-        <div class="dz-sub">Debe tener una pestaña CONDICIONES/OBSERVACIONES y una pestaña por año y moneda</div>
+        <div class="dz-sub">Una pestaña por año y moneda. Si no trae su propia pestaña de condiciones, usá el archivo de condiciones del paso 1</div>
         <input type="file" id="file-cuentas" accept=".xlsx,.xls" />
       </div>
       <div id="cuentas-loaded" style="display:none;">
@@ -381,13 +414,14 @@
           <span class="meta" id="cuentas-meta"></span>
           <button class="remove" id="cuentas-remove">Quitar</button>
         </div>
+        <div id="cond-source-note" style="display:none; margin-top:14px; padding:10px 14px; background:rgba(30,111,92,0.10); border:1px solid rgba(30,111,92,0.3); border-radius:3px; font-size:13px; color:var(--stamp-teal);"></div>
         <div id="cond-warning" style="display:none; margin-top:14px; padding:12px 14px; background:rgba(162,59,46,0.10); border:1px solid rgba(162,59,46,0.35); border-radius:3px; font-size:13px; color:var(--stamp-red-dark);">
-          ⚠ No se detectó automáticamente una pestaña de condiciones. <strong>Sin elegirla, la cuota mínima se calculará en $0 para todos los clientes.</strong> Seleccioná la pestaña correcta abajo.
+          ⚠ No se detectó una pestaña de condiciones (ni en el archivo del paso 1 ni dentro de este archivo). <strong>Sin condiciones, la cuota mínima se calculará en $0 para todos los clientes.</strong> Subí el archivo de condiciones en el paso 1, o elegí la pestaña correcta abajo si está dentro de este mismo archivo.
         </div>
-        <div class="field" style="margin-top:16px;">
-          <label class="field-label">Pestaña de condiciones</label>
+        <div class="field" id="wrap-sel-condiciones" style="margin-top:16px;">
+          <label class="field-label">Pestaña de condiciones dentro de este archivo (alternativa)</label>
           <select id="sel-condiciones"></select>
-          <div class="field-hint">Detectada automáticamente por nombre (CONDICIONES / OBSERVACIONES). Cambiala si no es correcta.</div>
+          <div class="field-hint">Solo se usa si no elegiste una provincia en el paso 1.</div>
         </div>
         <div class="field">
           <label class="field-label">Pestañas de cuentas a incluir</label>
@@ -397,10 +431,10 @@
     </div>
   </div>
 
-  <!-- PASO 2: SALDOS -->
+  <!-- PASO 3: SALDOS -->
   <div class="step" id="step2">
     <div class="step-head">
-      <div class="step-num">2</div>
+      <div class="step-num">3</div>
       <h2>Archivo de saldos de referencia</h2>
       <div class="sub">Opcional — para validar</div>
     </div>
@@ -426,10 +460,10 @@
     </div>
   </div>
 
-  <!-- PASO 3: PARAMETROS -->
+  <!-- PASO 4: PARAMETROS -->
   <div class="step">
     <div class="step-head">
-      <div class="step-num">3</div>
+      <div class="step-num">4</div>
       <h2>Parámetros de control</h2>
     </div>
     <div class="step-body">
@@ -1029,7 +1063,8 @@
 
   const state = {
     cuentasWb: null, cuentasFileName: '', cuentasSheets: [], // [{name, rows, checked}]
-    condSheetName: null, condRaw: [],
+    condSheetName: null, condRaw: [], // condiciones detectadas DENTRO del archivo de cuentas (alternativa)
+    condFileWb: null, condFileName: '', condFileSheetNames: [], condFileProvincia: null, condFileRaw: [], // archivo de condiciones separado
     saldosWb: null, saldosFileName: '', saldosSheetNames: [],
     mapping: {}, // cuentasSheetName -> saldosSheetName | ''
     excRows: [{ cod: '', cuota: '' }],
@@ -1106,6 +1141,94 @@
     return null;
   }
 
+  function getEffectiveCondRaw() {
+    // Prioridad: archivo de condiciones separado (paso 1) > pestaña dentro del archivo de cuentas
+    if (state.condFileProvincia && state.condFileRaw.length) {
+      return { condRaw: state.condFileRaw, source: `archivo de condiciones — ${state.condFileProvincia}` };
+    }
+    if (state.condSheetName && state.condRaw.length) {
+      return { condRaw: state.condRaw, source: `pestaña "${state.condSheetName}" del archivo de cuentas` };
+    }
+    return { condRaw: [], source: null };
+  }
+
+  // ---------- Paso 0: archivo de condiciones (separado, por provincia) ----------
+
+  function bindDropzone(dz, input, onFile) {
+    dz.addEventListener('click', () => input.click());
+    dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.classList.add('drag'); });
+    dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
+    dz.addEventListener('drop', (e) => {
+      e.preventDefault(); dz.classList.remove('drag');
+      if (e.dataTransfer.files.length) onFile(e.dataTransfer.files[0]);
+    });
+    input.addEventListener('change', () => { if (input.files.length) onFile(input.files[0]); });
+  }
+
+  const dzCondiciones = $('dz-condiciones');
+  const fileCondiciones = $('file-condiciones');
+  bindDropzone(dzCondiciones, fileCondiciones, handleCondicionesFile);
+
+  async function handleCondicionesFile(file) {
+    try {
+      const wb = await readWorkbook(file);
+      state.condFileWb = wb;
+      state.condFileName = file.name;
+      state.condFileSheetNames = wb.SheetNames;
+      state.condFileProvincia = wb.SheetNames[0] || null;
+      state.condFileRaw = state.condFileProvincia ? loadCondRaw(wb.Sheets[state.condFileProvincia]) : [];
+
+      $('dz-condiciones').style.display = 'none';
+      $('condiciones-loaded').style.display = 'block';
+      $('condiciones-filename').textContent = file.name;
+      $('condiciones-meta').textContent = `${wb.SheetNames.length} provincia(s)`;
+
+      const sel = $('sel-provincia');
+      sel.innerHTML = '';
+      wb.SheetNames.forEach(n => {
+        const o = el('option', null, n); o.value = n;
+        if (n === state.condFileProvincia) o.selected = true;
+        sel.appendChild(o);
+      });
+      sel.onchange = () => {
+        state.condFileProvincia = sel.value || null;
+        state.condFileRaw = state.condFileProvincia ? loadCondRaw(wb.Sheets[state.condFileProvincia]) : [];
+        updateCondNotices();
+      };
+
+      updateCondNotices();
+    } catch (err) {
+      alert('No se pudo leer el archivo de condiciones: ' + err.message);
+    }
+  }
+
+  $('condiciones-remove').addEventListener('click', () => {
+    state.condFileWb = null; state.condFileName = ''; state.condFileSheetNames = [];
+    state.condFileProvincia = null; state.condFileRaw = [];
+    $('dz-condiciones').style.display = 'block';
+    $('condiciones-loaded').style.display = 'none';
+    $('file-condiciones').value = '';
+    updateCondNotices();
+  });
+
+  function updateCondNotices() {
+    // Actualiza los avisos en el paso de cuentas según cuál sea la fuente efectiva de condiciones
+    if (!$('cond-warning')) return; // aún no se cargó el archivo de cuentas
+    const { source } = getEffectiveCondRaw();
+    const usingArchivoCondiciones = !!(state.condFileProvincia && state.condFileRaw.length);
+    $('cond-warning').style.display = source ? 'none' : 'block';
+    const note = $('cond-source-note');
+    if (usingArchivoCondiciones) {
+      note.style.display = 'block';
+      note.textContent = `✓ Usando condiciones del archivo separado — provincia: ${state.condFileProvincia}`;
+    } else {
+      note.style.display = 'none';
+    }
+    // Ocultar el selector interno si ya hay condiciones desde el archivo separado
+    const wrap = $('wrap-sel-condiciones');
+    if (wrap) wrap.style.display = usingArchivoCondiciones ? 'none' : 'block';
+  }
+
   function loadCondRaw(ws) {
     const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true });
     return aoa.slice(1)
@@ -1138,17 +1261,6 @@
 
   const dzCuentas = $('dz-cuentas');
   const fileCuentas = $('file-cuentas');
-
-  function bindDropzone(dz, input, onFile) {
-    dz.addEventListener('click', () => input.click());
-    dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.classList.add('drag'); });
-    dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
-    dz.addEventListener('drop', (e) => {
-      e.preventDefault(); dz.classList.remove('drag');
-      if (e.dataTransfer.files.length) onFile(e.dataTransfer.files[0]);
-    });
-    input.addEventListener('change', () => { if (input.files.length) onFile(input.files[0]); });
-  }
 
   bindDropzone(dzCuentas, fileCuentas, handleCuentasFile);
 
@@ -1183,24 +1295,6 @@
     const totalCli = state.cuentasSheets.reduce((a, s) => a + new Set(s.rows.map(r => String(r.COD_CLI).trim())).size, 0);
     $('cuentas-meta').textContent = `${state.cuentasSheets.length} pestañas · ~${totalCli} clientes`;
 
-    const condCountEl = $('cond-count') || (function () {
-      const hint = document.querySelector('#sel-condiciones').parentElement.querySelector('.field-hint');
-      const p = document.createElement('div');
-      p.id = 'cond-count';
-      p.className = 'field-hint';
-      p.style.fontWeight = '600';
-      hint.parentElement.insertBefore(p, hint);
-      return p;
-    })();
-    if (state.condRaw.length > 0) {
-      condCountEl.style.color = 'var(--pine)';
-      condCountEl.textContent = `✓ ${state.condRaw.length} grupos con condición cargados desde "${state.condSheetName}"`;
-    } else {
-      condCountEl.style.color = 'var(--stamp-red)';
-      condCountEl.textContent = `⚠ No se cargó ninguna condición — todas las cuotas mínimas darán 0. Elegí la pestaña correcta abajo.`;
-    }
-    $('cond-warning').style.display = state.condSheetName ? 'none' : 'block';
-
     const sel = $('sel-condiciones');
     sel.innerHTML = '';
     const optNone = el('option', null, 'Ninguna (sin condiciones)'); optNone.value = '';
@@ -1213,17 +1307,7 @@
     sel.onchange = () => {
       state.condSheetName = sel.value || null;
       state.condRaw = state.condSheetName ? loadCondRaw(state.cuentasWb.Sheets[state.condSheetName]) : [];
-      $('cond-warning').style.display = state.condSheetName ? 'none' : 'block';
-      const cc = $('cond-count');
-      if (cc) {
-        if (state.condRaw.length > 0) {
-          cc.style.color = 'var(--pine)';
-          cc.textContent = `✓ ${state.condRaw.length} grupos con condición cargados desde "${state.condSheetName}"`;
-        } else {
-          cc.style.color = 'var(--stamp-red)';
-          cc.textContent = `⚠ No se cargó ninguna condición — todas las cuotas mínimas darán 0. Elegí la pestaña correcta abajo.`;
-        }
-      }
+      updateCondNotices();
       state.cuentasSheets = state.cuentasWb.SheetNames
         .filter(n => n !== state.condSheetName)
         .map(n => {
@@ -1235,6 +1319,7 @@
       renderMappingRows();
     };
 
+    updateCondNotices();
     renderSheetsList();
   }
 
@@ -1355,10 +1440,11 @@
   // ---------- Analizar ----------
 
   $('btn-analizar').addEventListener('click', () => {
-    if (!state.condSheetName) {
+    const { source } = getEffectiveCondRaw();
+    if (!source) {
       const proceed = confirm(
-        'No elegiste una pestaña de condiciones.\n\n' +
-        'Sin ella, la cuota mínima de TODOS los clientes se calculará como $0, lo que puede marcar a todos como "al día" incorrectamente.\n\n' +
+        'No hay condiciones cargadas (ni del archivo de condiciones del paso 1, ni de una pestaña dentro del archivo de cuentas).\n\n' +
+        'Sin ellas, la cuota mínima de TODOS los clientes se calculará como $0, lo que puede marcar a todos como "al día" incorrectamente.\n\n' +
         '¿Seguro que querés continuar sin condiciones?'
       );
       if (!proceed) return;
@@ -1403,11 +1489,12 @@
       try {
         const baseConfig = buildConfig();
         const results = {};
+        const { condRaw: effectiveCondRaw } = getEffectiveCondRaw();
 
         // Grupos con beneficio por substring en nombre de grupo
         const gruposLib = new Set();
         if (baseConfig.gruposLibSubstring) {
-          state.condRaw.forEach(r => {
+          effectiveCondRaw.forEach(r => {
             if (String(r.NOMBRE_GRU || '').toUpperCase().includes(baseConfig.gruposLibSubstring)) {
               gruposLib.add(String(r.COD_GRU).trim());
             }
@@ -1417,7 +1504,7 @@
         state.cuentasSheets.filter(s => s.checked).forEach(s => {
           const moneda = guessMoneda(s.name);
           const config = Object.assign({}, baseConfig, { moneda });
-          const { results: res } = LedgerLogic.procesarHoja(s.rows, state.condRaw, config);
+          const { results: res } = LedgerLogic.procesarHoja(s.rows, effectiveCondRaw, config);
 
           // marcar beneficio por grupo
           res.forEach(r => { if (gruposLib.has(r.codGru)) r.esLib = true; });
