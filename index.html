@@ -218,6 +218,12 @@
   .exc-row input { flex: 1; }
   .exc-row button { flex-shrink: 0; }
 
+  .dif-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+  .dif-row input[type=text] { flex: 1.4; min-width: 110px; }
+  .dif-row select { flex: 1; min-width: 90px; }
+  .dif-row .arrow { color: var(--graphite-soft); font-size: 13px; flex-shrink: 0; }
+  .dif-row button { flex-shrink: 0; }
+
   /* ---------- Buttons ---------- */
   button.btn {
     font-family: 'Inter', sans-serif; font-weight: 600; font-size: 13.5px;
@@ -345,7 +351,7 @@
 <body>
 
 <div class="topbar">
-  <span class="version-badge">V5</span>
+  <span class="version-badge">V7</span>
   <div class="topbar-inner">
     <div class="brand-mark">
       <div class="glyph">CC</div>
@@ -487,6 +493,18 @@
           <div id="exc-rows"></div>
           <button class="btn btn-ghost btn-small" id="exc-add" type="button">+ Agregar cliente</button>
           <div class="field-hint">Usalo si algún cliente tiene una cuota mínima distinta a la de su grupo.</div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Pagos diferidos por cliente</label>
+          <div id="dif-rows"></div>
+          <button class="btn btn-ghost btn-small" id="dif-add" type="button">+ Agregar pago diferido</button>
+          <div class="field-hint">
+            Usalo cuando la condición dice, por ejemplo, "el cliente paga julio y agosto en agosto" — el mes de origen se suma
+            al mes de destino y no cuenta como impago. Esto <strong>no se detecta automáticamente</strong> del texto de la
+            condición porque las observaciones se redactan de formas muy distintas: cargalo manualmente después de leer la
+            observación. Mes 1=enero … 12=diciembre.
+          </div>
         </div>
 
         <div class="grid-2" style="margin-top:6px;">
@@ -634,16 +652,26 @@
     const tramos = [];
     const partes = String(text).toUpperCase().split(/\/\/|(?<!\d)\/(?!\d)/);
     for (const parte of partes) {
-      const mh = parte.match(/HASTA EL?\s*(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4})/);
-      const md = parte.match(/DESDE EL?\s*(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4})/);
+      // Un tramo puede tener AMBOS límites en la misma cláusula, ej:
+      // "DESDE EL 01/12/2024 HASTA EL 31/05/2025" -> rango acotado.
+      // Se buscan todas las fechas HASTA/DESDE presentes, no solo la primera.
+      const mdMatch = parte.match(/DESDE EL?\s*(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4})/);
+      const mhMatch = parte.match(/HASTA EL?\s*(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4})/);
       const mm = parte.match(/PAGO MINIMO MENSUAL[:\s]*([0-9][0-9.,]*)/);
       const ms = parte.match(/SEÑA[:\s]*([0-9][0-9.,]*)/);
       const cuota = mm ? toF(mm[1]) : null;
       const seña = ms ? toF(ms[1]) : null;
       if (!cuota) continue;
-      if (mh) tramos.push({ tipo: 'hasta', fecha: parseDMY(mh[1]), cuota, seña: seña || cuota });
-      else if (md) tramos.push({ tipo: 'desde', fecha: parseDMY(md[1]), cuota, seña: seña || cuota });
-      else tramos.push({ tipo: 'default', fecha: null, cuota, seña: seña || cuota });
+      if (mdMatch && mhMatch) {
+        // Rango acotado: DESDE X HASTA Y
+        tramos.push({ tipo: 'rango', fechaDesde: parseDMY(mdMatch[1]), fechaHasta: parseDMY(mhMatch[1]), cuota, seña: seña || cuota });
+      } else if (mhMatch) {
+        tramos.push({ tipo: 'hasta', fecha: parseDMY(mhMatch[1]), cuota, seña: seña || cuota });
+      } else if (mdMatch) {
+        tramos.push({ tipo: 'desde', fecha: parseDMY(mdMatch[1]), cuota, seña: seña || cuota });
+      } else {
+        tramos.push({ tipo: 'default', fecha: null, cuota, seña: seña || cuota });
+      }
     }
     return tramos;
   }
@@ -657,6 +685,11 @@
     if (!cinfo) return [0, 0];
     const tramos = parseTramos(cinfo.condicion);
     if (tramos.length) {
+      // Primero se busca coincidencia exacta de rango acotado (más específico),
+      // luego "hasta"/"desde" abiertos, y por último el tramo "default".
+      for (const t of tramos) {
+        if (t.tipo === 'rango' && primeraDin >= t.fechaDesde && primeraDin <= t.fechaHasta) return [t.cuota, t.seña];
+      }
       for (const t of tramos) {
         if (t.tipo === 'hasta' && primeraDin <= t.fecha) return [t.cuota, t.seña];
         if (t.tipo === 'desde' && primeraDin >= t.fecha) return [t.cuota, t.seña];
@@ -825,19 +858,26 @@
     return grp.some(r => r.T_COMP === 'REC' && r.FECHA_EMIS > ultimoNov && r.FECHA_EMIS < ultimaDinDate);
   }
 
-  function aplicarDiferido(monthlyRaw, cod, pagosDiferidos, año) {
+  function aplicarDiferido(monthlyRaw, cod, pagosDiferidos, año, cuotaDef) {
+    // Semántica: [mesQueDebiaPagar, mesEnQueRealmentePago].
+    // El pago combinado quedó registrado en "mesEnQueRealmentePago"; movemos de ahí
+    // hacia el mes que debía pagarse (hasta el importe de una cuota), dejando el resto
+    // donde estaba para que ese mes también quede cubierto.
     if (!pagosDiferidos[cod]) return monthlyRaw;
     const raw = Object.assign({}, monthlyRaw);
-    for (const [mi, mp] of pagosDiferidos[cod]) {
-      const kOrig = `${año}-${mi}`, kDest = `${año}-${mp}`;
-      raw[kDest] = (raw[kDest] || 0) + (raw[kOrig] || 0);
-      raw[kOrig] = 0;
+    for (const [mesDebido, mesPagado] of pagosDiferidos[cod]) {
+      const kDebido = `${año}-${mesDebido}`, kPagado = `${año}-${mesPagado}`;
+      const disponible = raw[kPagado] || 0;
+      const tope = (cuotaDef && cuotaDef > 0) ? cuotaDef : disponible;
+      const aMover = Math.min(disponible, tope);
+      raw[kDebido] = (raw[kDebido] || 0) + aMover;
+      raw[kPagado] = disponible - aMover;
     }
     return raw;
   }
 
   function analizarCliente(cod, rowsFull, cuGrupo, config) {
-    const { fechaCorte, lastEval, excepcionesCliente, pagosDiferidos, ganadorSorteo, moneda } = config;
+    const { fechaCorte, lastEval, excepcionesCliente, pagosDiferidos, ganadorSorteo, moneda, nobajas } = config;
 
     if (ganadorSorteo.has(cod)) {
       return {
@@ -952,7 +992,7 @@
       monthlyRaw[k] = (monthlyRaw[k] || 0) + (r.HABER || 0);
     }
     const añoDif = primeraDinFecha.getUTCFullYear();
-    const monthlyAdj = aplicarDiferido(monthlyRaw, cod, pagosDiferidos, añoDif);
+    const monthlyAdj = aplicarDiferido(monthlyRaw, cod, pagosDiferidos, añoDif, cuotaDef);
 
     const allMonths = monthsBetween([primerFecha.getUTCFullYear(), primerFecha.getUTCMonth() + 1], lastEval);
     let sf = 0, bajaYm = null;
@@ -1005,6 +1045,15 @@
       if (pagoFueraTermino) obsParts.push('PAGO FUERA DE TÉRMINO');
     } else {
       estado = 'AL DIA'; bajaDesde = '—';
+    }
+    // Excepción ##NOBAJA: si el cliente iba a quedar dado de baja pero su saldo
+    // pendiente está dentro del tope permitido, se revierte a AL DIA.
+    if (estado === 'DADO DE BAJA' && nobajas && nobajas[cod] !== undefined) {
+      const pendiente = (tpa || 0) - (totalPagadoActivo || 0);
+      if (pendiente <= nobajas[cod]) {
+        estado = 'AL DIA'; bajaDesde = '—';
+        obsParts.push(`Excepción: no se da de baja (saldo ≤ ${nobajas[cod]})`);
+      }
     }
     if (chequear) obsParts.push('CHEQUEAR COMPROBANTES');
 
@@ -1068,6 +1117,7 @@
     saldosWb: null, saldosFileName: '', saldosSheetNames: [],
     mapping: {}, // cuentasSheetName -> saldosSheetName | ''
     excRows: [{ cod: '', cuota: '' }],
+    difRows: [{ cod: '', mesOrigen: '', mesDestino: '' }],
     results: {}, // sheetName -> {results, counts, validation}
     activeTab: null,
   };
@@ -1214,13 +1264,24 @@
   function updateCondNotices() {
     // Actualiza los avisos en el paso de cuentas según cuál sea la fuente efectiva de condiciones
     if (!$('cond-warning')) return; // aún no se cargó el archivo de cuentas
-    const { source } = getEffectiveCondRaw();
+    const { source, condRaw } = getEffectiveCondRaw();
     const usingArchivoCondiciones = !!(state.condFileProvincia && state.condFileRaw.length);
     $('cond-warning').style.display = source ? 'none' : 'block';
     const note = $('cond-source-note');
     if (usingArchivoCondiciones) {
+      const tags = extraerTodosLosTags(condRaw);
+      const nCuotas = Object.keys(tags.cuotas).length;
+      const nDif = Object.keys(tags.diferidos).length;
+      const nNobaja = Object.keys(tags.nobajas).length;
+      const nSorteo = tags.sorteo.size;
+      const detalle = [];
+      if (nCuotas) detalle.push(`${nCuotas} cuota(s)`);
+      if (nDif) detalle.push(`${nDif} diferido(s)`);
+      if (nNobaja) detalle.push(`${nNobaja} no-baja`);
+      if (nSorteo) detalle.push(`${nSorteo} sorteo`);
       note.style.display = 'block';
-      note.textContent = `✓ Usando condiciones del archivo separado — provincia: ${state.condFileProvincia}`;
+      note.textContent = `✓ Usando condiciones del archivo separado — provincia: ${state.condFileProvincia}` +
+        (detalle.length ? ` · excepciones detectadas: ${detalle.join(', ')}` : '');
     } else {
       note.style.display = 'none';
     }
@@ -1233,7 +1294,71 @@
     const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true });
     return aoa.slice(1)
       .filter(r => r && r[0] !== undefined && r[0] !== null && String(r[0]).trim() !== '')
-      .map(r => ({ COD_GRU: r[0], NOMBRE_GRU: r[1], CONDICION: r[2] }));
+      .map(r => ({ COD_GRU: r[0], NOMBRE_GRU: r[1], CONDICION: r[2], EXCEPCIONES: r[3] }));
+  }
+
+  // ---------- Parser de etiquetas ##CUOTA / ##DIFERIDO / ##NOBAJA / ##SORTEO ----------
+  // Se buscan en la columna EXCEPCIONES (y también en CONDICION, por si alguna
+  // quedó mezclada ahí) de cada fila del archivo de condiciones.
+
+  function toFTag(s) {
+    return parseFloat(String(s).trim().replace(/\./g, '').replace(',', '.'));
+  }
+
+  function extraerTags(texto) {
+    const out = { cuotas: {}, diferidos: {}, nobajas: {}, sorteo: new Set() };
+    if (!texto) return out;
+    const t = String(texto);
+
+    for (const m of t.matchAll(/##CUOTA\(([^)]*)\)/gi)) {
+      m[1].split(';').forEach(seg => {
+        const mm = seg.match(/(\d{4,7})\s*:\s*([\d.,]+)\s*(USD|PESOS)?/i);
+        if (mm) out.cuotas[mm[1]] = toFTag(mm[2]);
+      });
+    }
+
+    for (const m of t.matchAll(/##DIFERIDO\(([^)]*)\)/gi)) {
+      const inner = m[1];
+      const codMatch = inner.match(/(\d{4,7})\s*:/);
+      if (!codMatch) continue;
+      const cod = codMatch[1];
+      const pares = [];
+      for (const pm of inner.matchAll(/(\d{1,2})\s*->\s*(\d{1,2})/g)) {
+        pares.push([parseInt(pm[1], 10), parseInt(pm[2], 10)]);
+      }
+      if (pares.length) {
+        if (!out.diferidos[cod]) out.diferidos[cod] = [];
+        out.diferidos[cod].push(...pares);
+      }
+    }
+
+    for (const m of t.matchAll(/##NOBAJA\(([^)]*)\)/gi)) {
+      const mm = m[1].match(/(\d{4,7})\s*:\s*saldo\s*<=\s*([\d.,]+)/i);
+      if (mm) out.nobajas[mm[1]] = toFTag(mm[2]);
+    }
+
+    for (const m of t.matchAll(/##SORTEO\(([^)]*)\)/gi)) {
+      m[1].split(',').forEach(c => { const cc = c.trim(); if (cc) out.sorteo.add(cc); });
+    }
+
+    return out;
+  }
+
+  function extraerTodosLosTags(condRaw) {
+    const total = { cuotas: {}, diferidos: {}, nobajas: {}, sorteo: new Set() };
+    condRaw.forEach(r => {
+      [r.EXCEPCIONES, r.CONDICION].forEach(texto => {
+        const t = extraerTags(texto);
+        Object.assign(total.cuotas, t.cuotas);
+        Object.entries(t.diferidos).forEach(([cod, pares]) => {
+          if (!total.diferidos[cod]) total.diferidos[cod] = [];
+          total.diferidos[cod].push(...pares);
+        });
+        Object.assign(total.nobajas, t.nobajas);
+        t.sorteo.forEach(c => total.sorteo.add(c));
+      });
+    });
+    return total;
   }
 
   function guessMoneda(sheetName) {
@@ -1422,6 +1547,38 @@
   $('exc-add').addEventListener('click', () => { state.excRows.push({ cod: '', cuota: '' }); renderExcRows(); });
   renderExcRows();
 
+  const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+  function renderDifRows() {
+    const wrap = $('dif-rows');
+    wrap.innerHTML = '';
+    state.difRows.forEach((row, i) => {
+      const r = el('div', 'dif-row');
+      const codInput = el('input'); codInput.type = 'text'; codInput.placeholder = 'Código de cliente'; codInput.value = row.cod;
+      codInput.oninput = () => { row.cod = codInput.value; };
+
+      const selOrigen = el('select');
+      const optO0 = el('option', null, 'Mes que debía…'); optO0.value = ''; selOrigen.appendChild(optO0);
+      MESES.forEach((m, idx) => { const o = el('option', null, m); o.value = String(idx + 1); if (row.mesOrigen === String(idx + 1)) o.selected = true; selOrigen.appendChild(o); });
+      selOrigen.onchange = () => { row.mesOrigen = selOrigen.value; };
+
+      const arrow = el('span', 'arrow', '→ se paga en →');
+
+      const selDestino = el('select');
+      const optD0 = el('option', null, '…se paga en'); optD0.value = ''; selDestino.appendChild(optD0);
+      MESES.forEach((m, idx) => { const o = el('option', null, m); o.value = String(idx + 1); if (row.mesDestino === String(idx + 1)) o.selected = true; selDestino.appendChild(o); });
+      selDestino.onchange = () => { row.mesDestino = selDestino.value; };
+
+      const rm = el('button', 'btn btn-danger btn-small', '✕'); rm.type = 'button';
+      rm.onclick = () => { state.difRows.splice(i, 1); renderDifRows(); };
+
+      r.appendChild(codInput); r.appendChild(selOrigen); r.appendChild(arrow); r.appendChild(selDestino); r.appendChild(rm);
+      wrap.appendChild(r);
+    });
+  }
+  $('dif-add').addEventListener('click', () => { state.difRows.push({ cod: '', mesOrigen: '', mesDestino: '' }); renderDifRows(); });
+  renderDifRows();
+
   // ---------- Config por defecto ----------
   (function setDefaults() {
     const today = new Date();
@@ -1466,6 +1623,17 @@
       if (cod && !isNaN(cuota)) excepcionesCliente[cod] = cuota;
     });
 
+    const pagosDiferidos = {};
+    state.difRows.forEach(r => {
+      const cod = String(r.cod || '').trim();
+      const mo = parseInt(r.mesOrigen, 10);
+      const md = parseInt(r.mesDestino, 10);
+      if (cod && mo >= 1 && mo <= 12 && md >= 1 && md <= 12) {
+        if (!pagosDiferidos[cod]) pagosDiferidos[cod] = [];
+        pagosDiferidos[cod].push([mo, md]);
+      }
+    });
+
     const sorteoTxt = $('cfg-sorteo').value || '';
     const ganadorSorteo = new Set(sorteoTxt.split(',').map(s => s.trim()).filter(Boolean));
 
@@ -1475,7 +1643,7 @@
 
     return {
       fechaCorte: fechaCorteExclusiva, lastEval, excepcionesCliente,
-      pagosDiferidos: {}, ganadorSorteo, tiposDescuento, gruposLibSubstring: libTxt,
+      pagosDiferidos, ganadorSorteo, tiposDescuento, gruposLibSubstring: libTxt,
       nombreInforme: $('cfg-nombre').value || 'Cuentas'
     };
   }
@@ -1490,6 +1658,15 @@
         const baseConfig = buildConfig();
         const results = {};
         const { condRaw: effectiveCondRaw } = getEffectiveCondRaw();
+
+        // Etiquetas ##CUOTA / ##DIFERIDO / ##NOBAJA / ##SORTEO del archivo de condiciones.
+        // Las entradas manuales (Parámetros de control) tienen prioridad sobre las del archivo,
+        // para poder probar un ajuste puntual sin tocar el Excel.
+        const tags = extraerTodosLosTags(effectiveCondRaw);
+        baseConfig.excepcionesCliente = Object.assign({}, tags.cuotas, baseConfig.excepcionesCliente);
+        baseConfig.pagosDiferidos = Object.assign({}, tags.diferidos, baseConfig.pagosDiferidos);
+        baseConfig.ganadorSorteo = new Set([...tags.sorteo, ...baseConfig.ganadorSorteo]);
+        baseConfig.nobajas = tags.nobajas;
 
         // Grupos con beneficio por substring en nombre de grupo
         const gruposLib = new Set();
