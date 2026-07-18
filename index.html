@@ -351,7 +351,7 @@
 <body>
 
 <div class="topbar">
-  <span class="version-badge">V7</span>
+  <span class="version-badge">V8</span>
   <div class="topbar-inner">
     <div class="brand-mark">
       <div class="glyph">CC</div>
@@ -476,7 +476,7 @@
       <div class="grid-2">
         <div class="field">
           <label class="field-label">Nombre del informe</label>
-          <input type="text" id="cfg-nombre" value="Cuentas" placeholder="Ej: Tucumán, Salta..." />
+          <input type="text" id="cfg-nombre" value="" placeholder="Ej: Tucumán, Salta..." />
         </div>
         <div class="field">
           <label class="field-label">Mes de evaluación</label>
@@ -484,45 +484,6 @@
           <div class="field-hint">Hasta qué mes se evalúa el cumplimiento de la cuota mínima.</div>
         </div>
       </div>
-
-      <fieldset class="advanced">
-        <legend>Opciones avanzadas</legend>
-
-        <div class="field">
-          <label class="field-label">Excepciones de cuota por cliente</label>
-          <div id="exc-rows"></div>
-          <button class="btn btn-ghost btn-small" id="exc-add" type="button">+ Agregar cliente</button>
-          <div class="field-hint">Usalo si algún cliente tiene una cuota mínima distinta a la de su grupo.</div>
-        </div>
-
-        <div class="field">
-          <label class="field-label">Pagos diferidos por cliente</label>
-          <div id="dif-rows"></div>
-          <button class="btn btn-ghost btn-small" id="dif-add" type="button">+ Agregar pago diferido</button>
-          <div class="field-hint">
-            Usalo cuando la condición dice, por ejemplo, "el cliente paga julio y agosto en agosto" — el mes de origen se suma
-            al mes de destino y no cuenta como impago. Esto <strong>no se detecta automáticamente</strong> del texto de la
-            condición porque las observaciones se redactan de formas muy distintas: cargalo manualmente después de leer la
-            observación. Mes 1=enero … 12=diciembre.
-          </div>
-        </div>
-
-        <div class="grid-2" style="margin-top:6px;">
-          <div class="field">
-            <label class="field-label">Clientes "ganador de sorteo" (sin análisis)</label>
-            <input type="text" id="cfg-sorteo" placeholder="Ej: 510443, 510444" />
-          </div>
-          <div class="field">
-            <label class="field-label">Texto que identifica grupos con beneficio</label>
-            <input type="text" id="cfg-lib" placeholder="Ej: C/LIB" />
-          </div>
-        </div>
-
-        <div class="checkbox-row">
-          <input type="checkbox" id="cfg-nc" />
-          <label for="cfg-nc">Tratar comprobante N/C como descuento del Total a Abonar (usar en Salta)</label>
-        </div>
-      </fieldset>
     </div>
   </div>
 
@@ -1116,8 +1077,6 @@
     condFileWb: null, condFileName: '', condFileSheetNames: [], condFileProvincia: null, condFileRaw: [], // archivo de condiciones separado
     saldosWb: null, saldosFileName: '', saldosSheetNames: [],
     mapping: {}, // cuentasSheetName -> saldosSheetName | ''
-    excRows: [{ cod: '', cuota: '' }],
-    difRows: [{ cod: '', mesOrigen: '', mesDestino: '' }],
     results: {}, // sheetName -> {results, counts, validation}
     activeTab: null,
   };
@@ -1527,58 +1486,6 @@
     });
   }
 
-  // ---------- Paso 3: excepciones dinámicas ----------
-
-  function renderExcRows() {
-    const wrap = $('exc-rows');
-    wrap.innerHTML = '';
-    state.excRows.forEach((row, i) => {
-      const r = el('div', 'exc-row');
-      const codInput = el('input'); codInput.type = 'text'; codInput.placeholder = 'Código de cliente'; codInput.value = row.cod;
-      codInput.oninput = () => { row.cod = codInput.value; };
-      const cuotaInput = el('input'); cuotaInput.type = 'number'; cuotaInput.placeholder = 'Cuota mínima'; cuotaInput.value = row.cuota;
-      cuotaInput.oninput = () => { row.cuota = cuotaInput.value; };
-      const rm = el('button', 'btn btn-danger btn-small', '✕'); rm.type = 'button';
-      rm.onclick = () => { state.excRows.splice(i, 1); renderExcRows(); };
-      r.appendChild(codInput); r.appendChild(cuotaInput); r.appendChild(rm);
-      wrap.appendChild(r);
-    });
-  }
-  $('exc-add').addEventListener('click', () => { state.excRows.push({ cod: '', cuota: '' }); renderExcRows(); });
-  renderExcRows();
-
-  const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-
-  function renderDifRows() {
-    const wrap = $('dif-rows');
-    wrap.innerHTML = '';
-    state.difRows.forEach((row, i) => {
-      const r = el('div', 'dif-row');
-      const codInput = el('input'); codInput.type = 'text'; codInput.placeholder = 'Código de cliente'; codInput.value = row.cod;
-      codInput.oninput = () => { row.cod = codInput.value; };
-
-      const selOrigen = el('select');
-      const optO0 = el('option', null, 'Mes que debía…'); optO0.value = ''; selOrigen.appendChild(optO0);
-      MESES.forEach((m, idx) => { const o = el('option', null, m); o.value = String(idx + 1); if (row.mesOrigen === String(idx + 1)) o.selected = true; selOrigen.appendChild(o); });
-      selOrigen.onchange = () => { row.mesOrigen = selOrigen.value; };
-
-      const arrow = el('span', 'arrow', '→ se paga en →');
-
-      const selDestino = el('select');
-      const optD0 = el('option', null, '…se paga en'); optD0.value = ''; selDestino.appendChild(optD0);
-      MESES.forEach((m, idx) => { const o = el('option', null, m); o.value = String(idx + 1); if (row.mesDestino === String(idx + 1)) o.selected = true; selDestino.appendChild(o); });
-      selDestino.onchange = () => { row.mesDestino = selDestino.value; };
-
-      const rm = el('button', 'btn btn-danger btn-small', '✕'); rm.type = 'button';
-      rm.onclick = () => { state.difRows.splice(i, 1); renderDifRows(); };
-
-      r.appendChild(codInput); r.appendChild(selOrigen); r.appendChild(arrow); r.appendChild(selDestino); r.appendChild(rm);
-      wrap.appendChild(r);
-    });
-  }
-  $('dif-add').addEventListener('click', () => { state.difRows.push({ cod: '', mesOrigen: '', mesDestino: '' }); renderDifRows(); });
-  renderDifRows();
-
   // ---------- Config por defecto ----------
   (function setDefaults() {
     const today = new Date();
@@ -1616,34 +1523,13 @@
     const levVal = $('cfg-lasteval').value; // "YYYY-MM"
     const lastEval = levVal ? [+levVal.slice(0,4), +levVal.slice(5,7)] : (() => { const d = new Date(); return [d.getFullYear(), d.getMonth()+1]; })();
 
-    const excepcionesCliente = {};
-    state.excRows.forEach(r => {
-      const cod = String(r.cod || '').trim();
-      const cuota = parseFloat(r.cuota);
-      if (cod && !isNaN(cuota)) excepcionesCliente[cod] = cuota;
-    });
-
-    const pagosDiferidos = {};
-    state.difRows.forEach(r => {
-      const cod = String(r.cod || '').trim();
-      const mo = parseInt(r.mesOrigen, 10);
-      const md = parseInt(r.mesDestino, 10);
-      if (cod && mo >= 1 && mo <= 12 && md >= 1 && md <= 12) {
-        if (!pagosDiferidos[cod]) pagosDiferidos[cod] = [];
-        pagosDiferidos[cod].push([mo, md]);
-      }
-    });
-
-    const sorteoTxt = $('cfg-sorteo').value || '';
-    const ganadorSorteo = new Set(sorteoTxt.split(',').map(s => s.trim()).filter(Boolean));
-
-    const libTxt = ($('cfg-lib').value || '').trim().toUpperCase();
-
-    const tiposDescuento = $('cfg-nc').checked ? ['DTO', 'LIB', 'NOP', 'N/C'] : ['DTO', 'LIB', 'NOP'];
-
+    // Las excepciones (cuota, pagos diferidos, sorteo, no-baja) se leen directamente
+    // desde las etiquetas ##CUOTA / ##DIFERIDO / ##NOBAJA / ##SORTEO del archivo de
+    // condiciones — no hay carga manual en la web.
     return {
-      fechaCorte: fechaCorteExclusiva, lastEval, excepcionesCliente,
-      pagosDiferidos, ganadorSorteo, tiposDescuento, gruposLibSubstring: libTxt,
+      fechaCorte: fechaCorteExclusiva, lastEval,
+      excepcionesCliente: {}, pagosDiferidos: {}, ganadorSorteo: new Set(),
+      tiposDescuento: ['DTO', 'LIB', 'NOP'], gruposLibSubstring: '',
       nombreInforme: $('cfg-nombre').value || 'Cuentas'
     };
   }
