@@ -358,7 +358,7 @@
 <body>
 
 <div class="topbar">
-  <span class="version-badge">V12</span>
+  <span class="version-badge">V13</span>
   <div class="topbar-inner">
     <div class="brand-mark">
       <div class="glyph">CC</div>
@@ -1803,6 +1803,85 @@
 
       container.appendChild(panel);
     });
+
+    // ---------- RESUMEN GLOBAL (todas las pestañas juntas) ----------
+    const resumenWrap = el('div');
+    resumenWrap.style.cssText = 'margin-top:30px; background:var(--paper-raised); border:1px solid var(--paper-line); border-radius:3px; padding:22px; box-shadow: var(--shadow);';
+    resumenWrap.appendChild(el('h3', 'display', 'Resumen'));
+    resumenWrap.querySelector('h3').style.cssText = 'margin:0 0 4px; font-size:19px; color:var(--ink);';
+    resumenWrap.appendChild(el('div', 'field-hint', 'Consolidado de todas las pestañas analizadas, por año y moneda.'));
+
+    const filas = sheetNames.map(n => {
+      const data = state.results[n];
+      const res = data.results;
+      const m = data.moneda;
+      const [año] = n.split(' ');
+
+      const activos = res.filter(r => r.estado === 'AL DIA' || r.estado === 'SIN PAGOS');
+      const activosConBaja = res.filter(r => r.estado === 'AL DIA' || r.estado === 'SIN PAGOS' || r.estado === 'DADO DE BAJA');
+
+      const totalAbonado = res.reduce((a, r) => a + (r.totalPagadoActivo || 0), 0);
+      const pendienteSinBajas = activos.reduce((a, r) => a + ((r.totalPorAbonar || 0) - (r.totalPagadoActivo || 0)), 0);
+      const pendienteConBajas = activosConBaja.reduce((a, r) => a + ((r.totalPorAbonar || 0) - (r.totalPagadoActivo || 0)), 0);
+      const pctCobrado = (totalAbonado + pendienteConBajas) > 0 ? totalAbonado / (totalAbonado + pendienteConBajas) : null;
+      const nActivos = activos.length;
+      const promSaldo = nActivos > 0 ? pendienteSinBajas / nActivos : null;
+      const fueraTermino = res.filter(r => (r.obs || '').includes('PAGO FUERA DE TÉRMINO')).length;
+      const gruposUnicos = new Set(res.map(r => r.codGru)).size;
+
+      return {
+        año, moneda: m,
+        alDia: data.counts['AL DIA'] || 0, baja: data.counts['DADO DE BAJA'] || 0,
+        saldada: data.counts['DEUDA SALDADA'] || 0, sinPagos: data.counts['SIN PAGOS'] || 0,
+        sorteo: data.counts['GANADOR SORTEO'] || 0, beneficios: data.counts['CON BENEFICIOS'] || 0,
+        totalClientes: res.length, grupos: gruposUnicos,
+        totalAbonado, pendienteSinBajas, pendienteConBajas, pctCobrado, promSaldo, fueraTermino
+      };
+    });
+
+    function tablaResumen(titulo, cols, filaFn) {
+      resumenWrap.appendChild(el('div', 'section-title', titulo));
+      const scroll = el('div', 'table-scroll');
+      const table = el('table', 'ledger');
+      table.innerHTML = `<thead><tr>${cols.map(c => `<th${c.num ? ' class="num"' : ''}>${c.label}</th>`).join('')}</tr></thead>`;
+      const tbody = el('tbody');
+      filas.forEach(f => {
+        const tr = el('tr');
+        tr.innerHTML = filaFn(f);
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      scroll.appendChild(table);
+      resumenWrap.appendChild(scroll);
+    }
+
+    tablaResumen('Estados y composición de clientes', [
+      { label: 'Año' }, { label: 'Moneda' }, { label: 'Al Día', num: true }, { label: 'Baja', num: true },
+      { label: 'Saldada', num: true }, { label: 'Sin Pagos', num: true }, { label: 'Sorteo', num: true },
+      { label: 'Beneficios', num: true }, { label: 'Total Clientes', num: true }, { label: 'Grupos Empresarios', num: true }
+    ], f => `<td>${f.año}</td><td>${f.moneda}</td>
+      <td class="num">${f.alDia}</td><td class="num">${f.baja}</td><td class="num">${f.saldada}</td>
+      <td class="num">${f.sinPagos}</td><td class="num">${f.sorteo}</td><td class="num">${f.beneficios}</td>
+      <td class="num">${f.totalClientes}</td><td class="num">${f.grupos}</td>`);
+
+    tablaResumen('Montos por año y moneda', [
+      { label: 'Año' }, { label: 'Moneda' }, { label: 'Total Abonado', num: true },
+      { label: 'Total por abonar (sin bajas)', num: true }, { label: 'Total por abonar (con bajas)', num: true },
+      { label: '% Cobrado', num: true }
+    ], f => `<td>${f.año}</td><td>${f.moneda}</td>
+      <td class="num">${fmtNum(f.totalAbonado, f.moneda)}</td>
+      <td class="num">${fmtNum(f.pendienteSinBajas, f.moneda)}</td>
+      <td class="num">${fmtNum(f.pendienteConBajas, f.moneda)}</td>
+      <td class="num">${f.pctCobrado != null ? (f.pctCobrado * 100).toFixed(1) + '%' : '—'}</td>`);
+
+    tablaResumen('Indicadores adicionales', [
+      { label: 'Año' }, { label: 'Moneda' }, { label: 'Prom. Saldo x Cliente Activo', num: true },
+      { label: 'Clientes Pago Fuera de Término', num: true }
+    ], f => `<td>${f.año}</td><td>${f.moneda}</td>
+      <td class="num">${f.promSaldo != null ? fmtNum(f.promSaldo, f.moneda) : '—'}</td>
+      <td class="num">${f.fueraTermino}</td>`);
+
+    container.appendChild(resumenWrap);
 
     // Botón descarga
     const dlWrap = el('div', 'toolbar-download');
