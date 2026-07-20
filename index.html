@@ -358,7 +358,7 @@
 <body>
 
 <div class="topbar">
-  <span class="version-badge">V11</span>
+  <span class="version-badge">V12</span>
   <div class="topbar-inner">
     <div class="brand-mark">
       <div class="glyph">CC</div>
@@ -1785,7 +1785,7 @@
         const tableBaja = el('table', 'ledger');
         tableBaja.innerHTML = `<thead><tr>
           <th>Código</th><th>Nombre</th><th>Grupo</th>
-          <th class="num">Saldo Pendiente</th><th>Baja Desde</th><th>Observaciones</th>
+          <th class="num">Saldo Pendiente</th><th>Baja Desde</th>
         </tr></thead>`;
         const tbodyBaja = el('tbody');
         bajas.forEach(r => {
@@ -1793,8 +1793,7 @@
           const tr = el('tr');
           tr.innerHTML = `<td>${r.cod}</td><td>${r.nombre}</td><td>${r.codGru}</td>
             <td class="num">${fmtNum(pend, data.moneda)}</td>
-            <td>${r.bajaDesde}</td>
-            <td>${r.obs}</td>`;
+            <td>${r.bajaDesde}</td>`;
           tbodyBaja.appendChild(tr);
         });
         tableBaja.appendChild(tbodyBaja);
