@@ -351,7 +351,7 @@
 <body>
 
 <div class="topbar">
-  <span class="version-badge">V9</span>
+  <span class="version-badge">V10</span>
   <div class="topbar-inner">
     <div class="brand-mark">
       <div class="glyph">CC</div>
@@ -738,9 +738,19 @@
 
     const ajd = sumWhere(bloque, 'DEBE', ['AJD']);
     const ajdCancela = Math.abs(ajd - credito) < 0.05 && credito > 0;
-    const tpaC = sumWhere(bloque, 'DEBE', ['CAU', 'DIN', 'RTC', 'ACT']);
+    const tpaC = sumWhere(bloque, 'DEBE', ['CAU', 'DIN', 'RTC', 'ACT', 'TSC']);
     const tiposDescuento = (config && config.tiposDescuento) || ['DTO', 'LIB', 'NOP'];
-    const tpaD = sumWhere(bloque, 'HABER', tiposDescuento);
+    const tiposDescuentoSinNC = tiposDescuento.filter(t => t !== 'N/C');
+    let tpaD = sumWhere(bloque, 'HABER', tiposDescuentoSinNC);
+    if (tiposDescuento.includes('N/C')) {
+      // Un N/C el mismo día que un FAC es una corrección/reversión interna (anula el FAC,
+      // que a su vez tampoco suma) — no debe tratarse como un descuento real de deuda.
+      // Un N/C sin FAC el mismo día sí es un descuento real y se resta normalmente.
+      bloque.filter(r => r.T_COMP === 'N/C').forEach(nc => {
+        const facMismoDia = bloque.some(r => r.T_COMP === 'FAC' && r.FECHA_EMIS.getTime() === nc.FECHA_EMIS.getTime());
+        if (!facMismoDia) tpaD += (nc.HABER || 0);
+      });
+    }
     let tpa;
     if (ajdCancela) {
       tpa = tpaC - tpaD;
@@ -1531,7 +1541,7 @@
     return {
       fechaCorte: fechaCorteExclusiva, lastEval,
       excepcionesCliente: {}, pagosDiferidos: {}, ganadorSorteo: new Set(),
-      tiposDescuento: ['DTO', 'LIB', 'NOP'], gruposLibSubstring: '',
+      tiposDescuento: ['DTO', 'LIB', 'NOP', 'N/C'], gruposLibSubstring: '',
       nombreInforme: $('cfg-nombre').value || 'Cuentas'
     };
   }
