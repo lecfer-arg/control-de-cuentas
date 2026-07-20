@@ -314,6 +314,13 @@
   .count-card.sp { border-left: 4px solid var(--gold); }
   .count-card.benef { border-left: 4px solid #7A4BA8; }
 
+  .section-title {
+    font-family: 'IBM Plex Serif', serif; font-weight: 600; font-size: 14.5px; color: var(--ink);
+    text-transform: uppercase; letter-spacing: 0.03em;
+    border-bottom: 2px solid var(--ink); padding-bottom: 6px; margin: 22px 0 12px;
+  }
+  .section-title:first-of-type { margin-top: 0; }
+
   .val-summary {
     display: flex; align-items: baseline; gap: 10px; margin: 4px 0 14px;
     font-size: 13.5px;
@@ -351,7 +358,7 @@
 <body>
 
 <div class="topbar">
-  <span class="version-badge">V10</span>
+  <span class="version-badge">V11</span>
   <div class="topbar-inner">
     <div class="brand-mark">
       <div class="glyph">CC</div>
@@ -1735,6 +1742,7 @@
           panel.appendChild(el('div', 'empty-note', 'Todos los saldos coinciden — no hay diferencias para mostrar.'));
         } else {
           if (v.diffs.length) {
+            panel.appendChild(el('div', 'section-title', 'Clientes a controlar su saldo'));
             const scroll = el('div', 'table-scroll');
             const table = el('table', 'ledger');
             table.innerHTML = `<thead><tr>
@@ -1765,6 +1773,33 @@
         }
       } else {
         panel.appendChild(el('div', 'empty-note', 'Sin archivo de saldos asociado a esta pestaña — no hay validación cruzada.'));
+      }
+
+      // Clientes dados de baja
+      const bajas = data.results.filter(r => r.estado === 'DADO DE BAJA');
+      panel.appendChild(el('div', 'section-title', 'Clientes dados de baja'));
+      if (bajas.length === 0) {
+        panel.appendChild(el('div', 'empty-note', 'No hay clientes dados de baja en esta pestaña.'));
+      } else {
+        const scrollBaja = el('div', 'table-scroll');
+        const tableBaja = el('table', 'ledger');
+        tableBaja.innerHTML = `<thead><tr>
+          <th>Código</th><th>Nombre</th><th>Grupo</th>
+          <th class="num">Saldo Pendiente</th><th>Baja Desde</th><th>Observaciones</th>
+        </tr></thead>`;
+        const tbodyBaja = el('tbody');
+        bajas.forEach(r => {
+          const pend = (r.totalPorAbonar || 0) - (r.totalPagadoActivo || 0);
+          const tr = el('tr');
+          tr.innerHTML = `<td>${r.cod}</td><td>${r.nombre}</td><td>${r.codGru}</td>
+            <td class="num">${fmtNum(pend, data.moneda)}</td>
+            <td>${r.bajaDesde}</td>
+            <td>${r.obs}</td>`;
+          tbodyBaja.appendChild(tr);
+        });
+        tableBaja.appendChild(tbodyBaja);
+        scrollBaja.appendChild(tableBaja);
+        panel.appendChild(scrollBaja);
       }
 
       container.appendChild(panel);
