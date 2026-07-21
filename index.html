@@ -362,7 +362,7 @@
 <body>
 
 <div class="topbar">
-  <span class="version-badge">V14</span>
+  <span class="version-badge">V15</span>
   <div class="topbar-inner">
     <div class="brand-mark">
       <div class="glyph">CC</div>
@@ -1905,23 +1905,6 @@
       <td class="num">${fmtNum(suma(fs,'pendienteSinBajas'), '')}</td>
       <td class="num">${fmtNum(suma(fs,'pendienteConBajas'), '')}</td>
       <td class="num">—</td><td class="num">—</td>`);
-
-    tablaResumen('Indicadores adicionales', [
-      { label: 'Año' }, { label: 'Moneda' }, { label: 'Prom. Saldo x Cliente Activo', num: true },
-      { label: 'Clientes Pago Fuera de Término', num: true }
-    ], f => `<td>${f.año}</td><td>${f.moneda}</td>
-      <td class="num">${f.promSaldo != null ? fmtNum(f.promSaldo, f.moneda) : '—'}</td>
-      <td class="num">${f.fueraTermino}</td>`,
-    fs => {
-      // El promedio total NO es la suma de los promedios de cada fila (no tendría sentido) —
-      // se recalcula como el total pendiente sin bajas dividido por el total de clientes activos.
-      const totalPendSinBajas = suma(fs, 'pendienteSinBajas');
-      const totalActivos = suma(fs, 'nActivos');
-      const promGlobal = totalActivos > 0 ? totalPendSinBajas / totalActivos : null;
-      return `<td colspan="2">TOTALES</td>
-        <td class="num">${promGlobal != null ? fmtNum(promGlobal, '') : '—'}</td>
-        <td class="num">${suma(fs,'fueraTermino')}</td>`;
-    });
 
     container.appendChild(resumenWrap);
 
