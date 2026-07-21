@@ -26,6 +26,8 @@
     --shadow: 0 2px 10px rgba(27, 42, 56, 0.10);
     --shadow-lg: 0 10px 34px rgba(27, 42, 56, 0.18);
     --radius: 3px;
+    --resumen-bg: #EAF1EA;
+    --resumen-border: #B9CFB9;
   }
 
   * { box-sizing: border-box; }
@@ -320,6 +322,8 @@
     border-bottom: 2px solid var(--ink); padding-bottom: 6px; margin: 22px 0 12px;
   }
   .section-title:first-of-type { margin-top: 0; }
+  .section-title.resumen-title { color: var(--pine-dark); border-bottom-color: var(--pine); }
+  .resumen-global table.ledger th { background: #DCE9DC; }
 
   .val-summary {
     display: flex; align-items: baseline; gap: 10px; margin: 4px 0 14px;
@@ -358,7 +362,7 @@
 <body>
 
 <div class="topbar">
-  <span class="version-badge">V13</span>
+  <span class="version-badge">V14</span>
   <div class="topbar-inner">
     <div class="brand-mark">
       <div class="glyph">CC</div>
@@ -1806,9 +1810,13 @@
 
     // ---------- RESUMEN GLOBAL (todas las pestañas juntas) ----------
     const resumenWrap = el('div');
-    resumenWrap.style.cssText = 'margin-top:30px; background:var(--paper-raised); border:1px solid var(--paper-line); border-radius:3px; padding:22px; box-shadow: var(--shadow);';
-    resumenWrap.appendChild(el('h3', 'display', 'Resumen'));
-    resumenWrap.querySelector('h3').style.cssText = 'margin:0 0 4px; font-size:19px; color:var(--ink);';
+    resumenWrap.className = 'resumen-global';
+    resumenWrap.style.cssText = 'margin-top:30px; background:var(--resumen-bg); border:1px solid var(--resumen-border); border-radius:3px; padding:22px; box-shadow: var(--shadow);';
+    const provinciaTitulo = state.condFileProvincia ? String(state.condFileProvincia).toUpperCase() : '';
+    const tituloResumen = provinciaTitulo ? `Resumen de ${provinciaTitulo}` : 'Resumen';
+    const h3Resumen = el('h3', 'display', tituloResumen);
+    h3Resumen.style.cssText = 'margin:0 0 4px; font-size:19px; color:var(--ink);';
+    resumenWrap.appendChild(h3Resumen);
     resumenWrap.appendChild(el('div', 'field-hint', 'Consolidado de todas las pestañas analizadas, por año y moneda.'));
 
     const filas = sheetNames.map(n => {
@@ -1817,9 +1825,12 @@
       const m = data.moneda;
       const [año] = n.split(' ');
 
+      // "Clientes activos" = Al Día + Sin Pagos (excluye Dados de Baja y Deuda Saldada,
+      // esta última tiene saldo $0 por definición).
       const activos = res.filter(r => r.estado === 'AL DIA' || r.estado === 'SIN PAGOS');
       const activosConBaja = res.filter(r => r.estado === 'AL DIA' || r.estado === 'SIN PAGOS' || r.estado === 'DADO DE BAJA');
 
+      const totalPasajerosPagaron = res.filter(r => (r.totalPagadoActivo || 0) > 0).length;
       const totalAbonado = res.reduce((a, r) => a + (r.totalPagadoActivo || 0), 0);
       const pendienteSinBajas = activos.reduce((a, r) => a + ((r.totalPorAbonar || 0) - (r.totalPagadoActivo || 0)), 0);
       const pendienteConBajas = activosConBaja.reduce((a, r) => a + ((r.totalPorAbonar || 0) - (r.totalPagadoActivo || 0)), 0);
@@ -1834,13 +1845,14 @@
         alDia: data.counts['AL DIA'] || 0, baja: data.counts['DADO DE BAJA'] || 0,
         saldada: data.counts['DEUDA SALDADA'] || 0, sinPagos: data.counts['SIN PAGOS'] || 0,
         sorteo: data.counts['GANADOR SORTEO'] || 0, beneficios: data.counts['CON BENEFICIOS'] || 0,
-        totalClientes: res.length, grupos: gruposUnicos,
-        totalAbonado, pendienteSinBajas, pendienteConBajas, pctCobrado, promSaldo, fueraTermino
+        totalClientes: res.length, grupos: gruposUnicos, totalPasajerosPagaron,
+        totalAbonado, pendienteSinBajas, pendienteConBajas, pctCobrado, promSaldo, fueraTermino,
+        nActivos
       };
     });
 
-    function tablaResumen(titulo, cols, filaFn) {
-      resumenWrap.appendChild(el('div', 'section-title', titulo));
+    function tablaResumen(titulo, cols, filaFn, totalesFn) {
+      resumenWrap.appendChild(el('div', 'section-title resumen-title', titulo));
       const scroll = el('div', 'table-scroll');
       const table = el('table', 'ledger');
       table.innerHTML = `<thead><tr>${cols.map(c => `<th${c.num ? ' class="num"' : ''}>${c.label}</th>`).join('')}</tr></thead>`;
@@ -1850,10 +1862,18 @@
         tr.innerHTML = filaFn(f);
         tbody.appendChild(tr);
       });
+      if (totalesFn) {
+        const trTot = el('tr');
+        trTot.style.cssText = 'font-weight:700; border-top:2px solid var(--ink); background:rgba(0,0,0,0.03);';
+        trTot.innerHTML = totalesFn(filas);
+        tbody.appendChild(trTot);
+      }
       table.appendChild(tbody);
       scroll.appendChild(table);
       resumenWrap.appendChild(scroll);
     }
+
+    const suma = (arr, key) => arr.reduce((a, f) => a + (f[key] || 0), 0);
 
     tablaResumen('Estados y composición de clientes', [
       { label: 'Año' }, { label: 'Moneda' }, { label: 'Al Día', num: true }, { label: 'Baja', num: true },
@@ -1862,24 +1882,46 @@
     ], f => `<td>${f.año}</td><td>${f.moneda}</td>
       <td class="num">${f.alDia}</td><td class="num">${f.baja}</td><td class="num">${f.saldada}</td>
       <td class="num">${f.sinPagos}</td><td class="num">${f.sorteo}</td><td class="num">${f.beneficios}</td>
-      <td class="num">${f.totalClientes}</td><td class="num">${f.grupos}</td>`);
+      <td class="num">${f.totalClientes}</td><td class="num">${f.grupos}</td>`,
+    fs => `<td colspan="2">TOTALES</td>
+      <td class="num">${suma(fs,'alDia')}</td><td class="num">${suma(fs,'baja')}</td><td class="num">${suma(fs,'saldada')}</td>
+      <td class="num">${suma(fs,'sinPagos')}</td><td class="num">${suma(fs,'sorteo')}</td><td class="num">${suma(fs,'beneficios')}</td>
+      <td class="num">${suma(fs,'totalClientes')}</td><td class="num">${suma(fs,'grupos')}</td>`);
 
     tablaResumen('Montos por año y moneda', [
-      { label: 'Año' }, { label: 'Moneda' }, { label: 'Total Abonado', num: true },
+      { label: 'Año' }, { label: 'Moneda' }, { label: 'Total de pasajeros', num: true }, { label: 'Total Abonado', num: true },
       { label: 'Total por abonar (sin bajas)', num: true }, { label: 'Total por abonar (con bajas)', num: true },
-      { label: '% Cobrado', num: true }
+      { label: '% Cobrado', num: true }, { label: '% Falta por Cobrar', num: true }
     ], f => `<td>${f.año}</td><td>${f.moneda}</td>
+      <td class="num">${f.totalPasajerosPagaron}</td>
       <td class="num">${fmtNum(f.totalAbonado, f.moneda)}</td>
       <td class="num">${fmtNum(f.pendienteSinBajas, f.moneda)}</td>
       <td class="num">${fmtNum(f.pendienteConBajas, f.moneda)}</td>
-      <td class="num">${f.pctCobrado != null ? (f.pctCobrado * 100).toFixed(1) + '%' : '—'}</td>`);
+      <td class="num">${f.pctCobrado != null ? (f.pctCobrado * 100).toFixed(1) + '%' : '—'}</td>
+      <td class="num">${f.pctCobrado != null ? ((1 - f.pctCobrado) * 100).toFixed(1) + '%' : '—'}</td>`,
+    fs => `<td colspan="2">TOTALES</td>
+      <td class="num">${suma(fs,'totalPasajerosPagaron')}</td>
+      <td class="num">${fmtNum(suma(fs,'totalAbonado'), '')}</td>
+      <td class="num">${fmtNum(suma(fs,'pendienteSinBajas'), '')}</td>
+      <td class="num">${fmtNum(suma(fs,'pendienteConBajas'), '')}</td>
+      <td class="num">—</td><td class="num">—</td>`);
 
     tablaResumen('Indicadores adicionales', [
       { label: 'Año' }, { label: 'Moneda' }, { label: 'Prom. Saldo x Cliente Activo', num: true },
       { label: 'Clientes Pago Fuera de Término', num: true }
     ], f => `<td>${f.año}</td><td>${f.moneda}</td>
       <td class="num">${f.promSaldo != null ? fmtNum(f.promSaldo, f.moneda) : '—'}</td>
-      <td class="num">${f.fueraTermino}</td>`);
+      <td class="num">${f.fueraTermino}</td>`,
+    fs => {
+      // El promedio total NO es la suma de los promedios de cada fila (no tendría sentido) —
+      // se recalcula como el total pendiente sin bajas dividido por el total de clientes activos.
+      const totalPendSinBajas = suma(fs, 'pendienteSinBajas');
+      const totalActivos = suma(fs, 'nActivos');
+      const promGlobal = totalActivos > 0 ? totalPendSinBajas / totalActivos : null;
+      return `<td colspan="2">TOTALES</td>
+        <td class="num">${promGlobal != null ? fmtNum(promGlobal, '') : '—'}</td>
+        <td class="num">${suma(fs,'fueraTermino')}</td>`;
+    });
 
     container.appendChild(resumenWrap);
 
