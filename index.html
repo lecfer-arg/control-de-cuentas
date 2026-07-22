@@ -362,7 +362,7 @@
 <body>
 
 <div class="topbar">
-  <span class="version-badge">V15</span>
+  <span class="version-badge">V16</span>
   <div class="topbar-inner">
     <div class="brand-mark">
       <div class="glyph">CC</div>
@@ -731,7 +731,13 @@
       } else {
         credito = saldoPostNov < 0 ? Math.abs(saldoPostNov) : 0;
         deuda = 0;
-        for (let i = idxNov + 1; i < pidx; i++) if (grp[i].T_COMP === 'REC') recsEntre.push(grp[i]);
+        // Un TSC entre el NOV y el nuevo viaje es una "transferencia de saldo cliente":
+        // el crédito que dejó el NOV se movió a otra cuenta y ya no está disponible
+        // para descontar del nuevo viaje. Se resta ese monto del crédito (sin bajar de 0).
+        let tscEntre = 0;
+        for (let i = idxNov + 1; i < pidx; i++) if (grp[i].T_COMP === 'TSC') tscEntre += (grp[i].DEBE || 0);
+        if (tscEntre > 0) credito = Math.max(0, credito - tscEntre);
+        for (let i = idxNov + 1; i < pidx; i++) if (grp[i].T_COMP === 'REC' || grp[i].T_COMP === 'RSC') recsEntre.push(grp[i]);
       }
     } else if (novBloqueIdxs.length > 0) {
       const prev = grp.slice(0, pidx);
@@ -803,7 +809,7 @@
       const idxNov = novPrevioIdxs[novPrevioIdxs.length - 1];
       let hayRnv = false;
       for (let i = idxNov + 1; i < pidx; i++) if (grp[i].T_COMP === 'RNV') { hayRnv = true; break; }
-      if (!hayRnv) for (let i = idxNov + 1; i < pidx; i++) if (grp[i].T_COMP === 'REC') recs.push(grp[i]);
+      if (!hayRnv) for (let i = idxNov + 1; i < pidx; i++) if (grp[i].T_COMP === 'REC' || grp[i].T_COMP === 'RSC') recs.push(grp[i]);
     }
     for (let i = pidx; i < grp.length; i++) if (grp[i].T_COMP === 'REC' || grp[i].T_COMP === 'RSC') recs.push(grp[i]);
     recs.sort((a, b) => a.FECHA_EMIS - b.FECHA_EMIS);
