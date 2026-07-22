@@ -362,7 +362,7 @@
 <body>
 
 <div class="topbar">
-  <span class="version-badge">V16</span>
+  <span class="version-badge">V17</span>
   <div class="topbar-inner">
     <div class="brand-mark">
       <div class="glyph">CC</div>
@@ -755,7 +755,7 @@
 
     const ajd = sumWhere(bloque, 'DEBE', ['AJD']);
     const ajdCancela = Math.abs(ajd - credito) < 0.05 && credito > 0;
-    const tpaC = sumWhere(bloque, 'DEBE', ['CAU', 'DIN', 'RTC', 'ACT', 'TSC']);
+    const tpaC = sumWhere(bloque, 'DEBE', ['CAU', 'DIN', 'RTC', 'ACT', 'TSC', 'N/D']);
     const tiposDescuento = (config && config.tiposDescuento) || ['DTO', 'LIB', 'NOP'];
     const tiposDescuentoSinNC = tiposDescuento.filter(t => t !== 'N/C');
     let tpaD = sumWhere(bloque, 'HABER', tiposDescuentoSinNC);
