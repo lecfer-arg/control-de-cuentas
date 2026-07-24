@@ -362,7 +362,7 @@
 <body>
 
 <div class="topbar">
-  <span class="version-badge">V21</span>
+  <span class="version-badge">V22</span>
   <div class="topbar-inner">
     <div class="brand-mark">
       <div class="glyph">CC</div>
@@ -1766,10 +1766,27 @@
         const pctSinCuota = activosSinCuota.length / Math.max(data.results.length, 1);
         const warn = el('div');
         warn.style.cssText = 'margin-bottom:16px; padding:10px 14px; border-radius:3px; font-size:12.5px; background:rgba(184,134,43,0.12); border:1px solid rgba(184,134,43,0.35); color:#8A6412;';
-        warn.textContent = `⚠ ${activosSinCuota.length} de ${data.results.length} clientes activos tienen Cuota Mínima en 0. `
+
+        // Agrupar por grupo empresario para poder señalar exactamente cuáles faltan
+        const { condRaw: condRawActual } = getEffectiveCondRaw();
+        const nombrePorGrupo = (codGru) => {
+          const entry = condRawActual.find(c => String(c.COD_GRU).trim() === codGru);
+          return entry ? entry.NOMBRE_GRU : null;
+        };
+        const gruposAfectados = new Map(); // codGru -> {count, nombre}
+        activosSinCuota.forEach(r => {
+          if (!gruposAfectados.has(r.codGru)) gruposAfectados.set(r.codGru, { count: 0, nombre: nombrePorGrupo(r.codGru) });
+          gruposAfectados.get(r.codGru).count++;
+        });
+        const listaGrupos = [...gruposAfectados.entries()]
+          .map(([cg, info]) => `Grupo ${cg}${info.nombre ? ` ("${info.nombre}")` : ' (no está en el archivo de condiciones)'} — ${info.count} cliente(s)`)
+          .join('<br>&nbsp;&nbsp;• ');
+
+        warn.innerHTML = `⚠ ${activosSinCuota.length} de ${data.results.length} clientes activos tienen Cuota Mínima en 0. `
           + (pctSinCuota > 0.3
             ? 'Revisá que la pestaña de condiciones esté bien elegida y que el código de grupo coincida entre ambas pestañas.'
-            : 'Puede ser normal si esos grupos no tienen cuota mínima definida, o revisá sus condiciones puntuales.');
+            : 'Puede ser normal si esos grupos no tienen cuota mínima definida, o revisá sus condiciones puntuales.')
+          + `<br><br>Grupo(s) empresario(s) afectado(s):<br>&nbsp;&nbsp;• ${listaGrupos}`;
         panel.appendChild(warn);
       }
 
