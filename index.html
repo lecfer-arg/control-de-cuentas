@@ -362,7 +362,7 @@
 <body>
 
 <div class="topbar">
-  <span class="version-badge">V18</span>
+  <span class="version-badge">V19</span>
   <div class="topbar-inner">
     <div class="brand-mark">
       <div class="glyph">CC</div>
@@ -1814,7 +1814,7 @@
       container.appendChild(panel);
     });
 
-    // ---------- RESUMEN GLOBAL (todas las pestañas juntas) ----------
+    // ---------- RESUMEN GLOBAL (todas las pestañas juntas, separado por moneda) ----------
     const resumenWrap = el('div');
     resumenWrap.className = 'resumen-global';
     resumenWrap.style.cssText = 'margin-top:30px; background:var(--resumen-bg); border:1px solid var(--resumen-border); border-radius:3px; padding:22px; box-shadow: var(--shadow);';
@@ -1823,7 +1823,7 @@
     const h3Resumen = el('h3', 'display', tituloResumen);
     h3Resumen.style.cssText = 'margin:0 0 4px; font-size:19px; color:var(--ink);';
     resumenWrap.appendChild(h3Resumen);
-    resumenWrap.appendChild(el('div', 'field-hint', 'Consolidado de todas las pestañas analizadas, por año y moneda.'));
+    resumenWrap.appendChild(el('div', 'field-hint', 'Consolidado de todas las pestañas analizadas, separado por moneda.'));
 
     const filas = sheetNames.map(n => {
       const data = state.results[n];
@@ -1857,13 +1857,15 @@
       };
     });
 
-    function tablaResumen(titulo, cols, filaFn, totalesFn) {
-      resumenWrap.appendChild(el('div', 'section-title resumen-title', titulo));
+    const suma = (arr, key) => arr.reduce((a, f) => a + (f[key] || 0), 0);
+
+    function tablaResumen(wrapEl, filasMoneda, titulo, cols, filaFn, totalesFn) {
+      wrapEl.appendChild(el('div', 'section-title resumen-title', titulo));
       const scroll = el('div', 'table-scroll');
       const table = el('table', 'ledger');
       table.innerHTML = `<thead><tr>${cols.map(c => `<th${c.num ? ' class="num"' : ''}>${c.label}</th>`).join('')}</tr></thead>`;
       const tbody = el('tbody');
-      filas.forEach(f => {
+      filasMoneda.forEach(f => {
         const tr = el('tr');
         tr.innerHTML = filaFn(f);
         tbody.appendChild(tr);
@@ -1871,46 +1873,59 @@
       if (totalesFn) {
         const trTot = el('tr');
         trTot.style.cssText = 'font-weight:700; border-top:2px solid var(--ink); background:rgba(0,0,0,0.03);';
-        trTot.innerHTML = totalesFn(filas);
+        trTot.innerHTML = totalesFn(filasMoneda);
         tbody.appendChild(trTot);
       }
       table.appendChild(tbody);
       scroll.appendChild(table);
-      resumenWrap.appendChild(scroll);
+      wrapEl.appendChild(scroll);
     }
 
-    const suma = (arr, key) => arr.reduce((a, f) => a + (f[key] || 0), 0);
+    function renderBloqueMoneda(moneda, filasMoneda, nombreBloque) {
+      if (!filasMoneda.length) return;
+      const bloque = el('div');
+      bloque.style.cssText = 'margin-top:18px;';
+      const tituloBloque = el('div');
+      tituloBloque.style.cssText = 'font-family:"IBM Plex Serif",serif; font-weight:700; font-size:16px; color:var(--pine-dark); margin-bottom:6px;';
+      tituloBloque.textContent = nombreBloque;
+      bloque.appendChild(tituloBloque);
 
-    tablaResumen('Estados y composición de clientes', [
-      { label: 'Año' }, { label: 'Moneda' }, { label: 'Al Día', num: true }, { label: 'Baja', num: true },
-      { label: 'Saldada', num: true }, { label: 'Sin Pagos', num: true }, { label: 'Sorteo', num: true },
-      { label: 'Beneficios', num: true }, { label: 'Total Clientes', num: true }, { label: 'Grupos Empresarios', num: true }
-    ], f => `<td>${f.año}</td><td>${f.moneda}</td>
-      <td class="num">${f.alDia}</td><td class="num">${f.baja}</td><td class="num">${f.saldada}</td>
-      <td class="num">${f.sinPagos}</td><td class="num">${f.sorteo}</td><td class="num">${f.beneficios}</td>
-      <td class="num">${f.totalClientes}</td><td class="num">${f.grupos}</td>`,
-    fs => `<td colspan="2">TOTALES</td>
-      <td class="num">${suma(fs,'alDia')}</td><td class="num">${suma(fs,'baja')}</td><td class="num">${suma(fs,'saldada')}</td>
-      <td class="num">${suma(fs,'sinPagos')}</td><td class="num">${suma(fs,'sorteo')}</td><td class="num">${suma(fs,'beneficios')}</td>
-      <td class="num">${suma(fs,'totalClientes')}</td><td class="num">${suma(fs,'grupos')}</td>`);
+      tablaResumen(bloque, filasMoneda, 'Estados y composición de clientes', [
+        { label: 'Año' }, { label: 'Al Día', num: true }, { label: 'Baja', num: true },
+        { label: 'Saldada', num: true }, { label: 'Sin Pagos', num: true }, { label: 'Sorteo', num: true },
+        { label: 'Beneficios', num: true }, { label: 'Total Clientes', num: true }, { label: 'Grupos Empresarios', num: true }
+      ], f => `<td>${f.año}</td>
+        <td class="num">${f.alDia}</td><td class="num">${f.baja}</td><td class="num">${f.saldada}</td>
+        <td class="num">${f.sinPagos}</td><td class="num">${f.sorteo}</td><td class="num">${f.beneficios}</td>
+        <td class="num">${f.totalClientes}</td><td class="num">${f.grupos}</td>`,
+      fs => `<td>TOTALES</td>
+        <td class="num">${suma(fs,'alDia')}</td><td class="num">${suma(fs,'baja')}</td><td class="num">${suma(fs,'saldada')}</td>
+        <td class="num">${suma(fs,'sinPagos')}</td><td class="num">${suma(fs,'sorteo')}</td><td class="num">${suma(fs,'beneficios')}</td>
+        <td class="num">${suma(fs,'totalClientes')}</td><td class="num">${suma(fs,'grupos')}</td>`);
 
-    tablaResumen('Montos por año y moneda', [
-      { label: 'Año' }, { label: 'Moneda' }, { label: 'Total de pasajeros', num: true }, { label: 'Total Abonado', num: true },
-      { label: 'Total por abonar (sin bajas)', num: true }, { label: 'Total por abonar (con bajas)', num: true },
-      { label: '% Cobrado', num: true }, { label: '% Falta por Cobrar', num: true }
-    ], f => `<td>${f.año}</td><td>${f.moneda}</td>
-      <td class="num">${f.totalPasajerosPagaron}</td>
-      <td class="num">${fmtNum(f.totalAbonado, f.moneda)}</td>
-      <td class="num">${fmtNum(f.pendienteSinBajas, f.moneda)}</td>
-      <td class="num">${fmtNum(f.pendienteConBajas, f.moneda)}</td>
-      <td class="num">${f.pctCobrado != null ? (f.pctCobrado * 100).toFixed(1) + '%' : '—'}</td>
-      <td class="num">${f.pctCobrado != null ? ((1 - f.pctCobrado) * 100).toFixed(1) + '%' : '—'}</td>`,
-    fs => `<td colspan="2">TOTALES</td>
-      <td class="num">${suma(fs,'totalPasajerosPagaron')}</td>
-      <td class="num">${fmtNum(suma(fs,'totalAbonado'), '')}</td>
-      <td class="num">${fmtNum(suma(fs,'pendienteSinBajas'), '')}</td>
-      <td class="num">${fmtNum(suma(fs,'pendienteConBajas'), '')}</td>
-      <td class="num">—</td><td class="num">—</td>`);
+      tablaResumen(bloque, filasMoneda, 'Montos por año', [
+        { label: 'Año' }, { label: 'Total de pasajeros', num: true }, { label: 'Total Abonado', num: true },
+        { label: 'Total por abonar (sin bajas)', num: true }, { label: 'Total por abonar (con bajas)', num: true },
+        { label: '% Cobrado', num: true }, { label: '% Falta por Cobrar', num: true }
+      ], f => `<td>${f.año}</td>
+        <td class="num">${f.totalPasajerosPagaron}</td>
+        <td class="num">${fmtNum(f.totalAbonado, moneda)}</td>
+        <td class="num">${fmtNum(f.pendienteSinBajas, moneda)}</td>
+        <td class="num">${fmtNum(f.pendienteConBajas, moneda)}</td>
+        <td class="num">${f.pctCobrado != null ? (f.pctCobrado * 100).toFixed(1) + '%' : '—'}</td>
+        <td class="num">${f.pctCobrado != null ? ((1 - f.pctCobrado) * 100).toFixed(1) + '%' : '—'}</td>`,
+      fs => `<td>TOTALES</td>
+        <td class="num">${suma(fs,'totalPasajerosPagaron')}</td>
+        <td class="num">${fmtNum(suma(fs,'totalAbonado'), moneda)}</td>
+        <td class="num">${fmtNum(suma(fs,'pendienteSinBajas'), moneda)}</td>
+        <td class="num">${fmtNum(suma(fs,'pendienteConBajas'), moneda)}</td>
+        <td class="num">—</td><td class="num">—</td>`);
+
+      resumenWrap.appendChild(bloque);
+    }
+
+    renderBloqueMoneda('PESOS', filas.filter(f => f.moneda === 'PESOS'), 'Resumen en Pesos');
+    renderBloqueMoneda('USD', filas.filter(f => f.moneda === 'USD'), 'Resumen en Dólares');
 
     container.appendChild(resumenWrap);
 
