@@ -362,7 +362,7 @@
 <body>
 
 <div class="topbar">
-  <span class="version-badge">V22</span>
+  <span class="version-badge">V23</span>
   <div class="topbar-inner">
     <div class="brand-mark">
       <div class="glyph">CC</div>
@@ -1891,12 +1891,10 @@
 
       Object.entries(porDestino).forEach(([destino, resDestino]) => {
         const activos = resDestino.filter(r => r.estado === 'AL DIA' || r.estado === 'SIN PAGOS');
-        const activosConBaja = resDestino.filter(r => r.estado === 'AL DIA' || r.estado === 'SIN PAGOS' || r.estado === 'DADO DE BAJA');
         const totalPasajerosPagaron = resDestino.filter(r => (r.totalPagadoActivo || 0) > 0).length;
         const totalAbonado = resDestino.reduce((a, r) => a + (r.totalPagadoActivo || 0), 0);
         const pendienteSinBajas = activos.reduce((a, r) => a + ((r.totalPorAbonar || 0) - (r.totalPagadoActivo || 0)), 0);
-        const pendienteConBajas = activosConBaja.reduce((a, r) => a + ((r.totalPorAbonar || 0) - (r.totalPagadoActivo || 0)), 0);
-        const pctCobrado = (totalAbonado + pendienteConBajas) > 0 ? totalAbonado / (totalAbonado + pendienteConBajas) : null;
+        const pctCobrado = (totalAbonado + pendienteSinBajas) > 0 ? totalAbonado / (totalAbonado + pendienteSinBajas) : null;
         const gruposUnicos = new Set(resDestino.map(r => r.codGru)).size;
 
         const alDia = resDestino.filter(r => r.estado === 'AL DIA' && !r.esLib).length;
@@ -1910,7 +1908,7 @@
           año, moneda: m, destino,
           alDia, baja, saldada, sinPagos, sorteo, beneficios,
           totalClientes: resDestino.length, grupos: gruposUnicos, totalPasajerosPagaron,
-          totalAbonado, pendienteSinBajas, pendienteConBajas, pctCobrado
+          totalAbonado, pendienteSinBajas, pctCobrado
         });
       });
     });
@@ -1949,7 +1947,7 @@
       tituloBloque.textContent = nombreBloque;
       bloque.appendChild(tituloBloque);
 
-      tablaResumen(bloque, filasMoneda, 'Estados y composición de clientes', [
+      tablaResumen(bloque, filasMoneda, 'Composición de grupos', [
         { label: 'Año' }, { label: 'Destino' }, { label: 'Al Día', num: true }, { label: 'Baja', num: true },
         { label: 'Saldada', num: true }, { label: 'Sin Pagos', num: true }, { label: 'Sorteo', num: true },
         { label: 'Beneficios', num: true }, { label: 'Total Clientes', num: true }, { label: 'Grupos Empresarios', num: true }
@@ -1962,22 +1960,20 @@
         <td class="num">${suma(fs,'sinPagos')}</td><td class="num">${suma(fs,'sorteo')}</td><td class="num">${suma(fs,'beneficios')}</td>
         <td class="num">${suma(fs,'totalClientes')}</td><td class="num">${suma(fs,'grupos')}</td>`);
 
-      tablaResumen(bloque, filasMoneda, 'Montos por año', [
+      tablaResumen(bloque, filasMoneda, 'Informe General de Cuentas', [
         { label: 'Año' }, { label: 'Destino' }, { label: 'Total de pasajeros', num: true }, { label: 'Total Abonado', num: true },
-        { label: 'Total por abonar (sin bajas)', num: true }, { label: 'Total por abonar (con bajas)', num: true },
+        { label: 'Total por abonar', num: true },
         { label: '% Cobrado', num: true }, { label: '% Falta por Cobrar', num: true }
       ], f => `<td>${f.año}</td><td>${f.destino}</td>
         <td class="num">${f.totalPasajerosPagaron}</td>
         <td class="num">${fmtNum(f.totalAbonado, moneda)}</td>
         <td class="num">${fmtNum(f.pendienteSinBajas, moneda)}</td>
-        <td class="num">${fmtNum(f.pendienteConBajas, moneda)}</td>
         <td class="num">${f.pctCobrado != null ? (f.pctCobrado * 100).toFixed(1) + '%' : '—'}</td>
         <td class="num">${f.pctCobrado != null ? ((1 - f.pctCobrado) * 100).toFixed(1) + '%' : '—'}</td>`,
       fs => `<td colspan="2">TOTALES</td>
         <td class="num">${suma(fs,'totalPasajerosPagaron')}</td>
         <td class="num">${fmtNum(suma(fs,'totalAbonado'), moneda)}</td>
         <td class="num">${fmtNum(suma(fs,'pendienteSinBajas'), moneda)}</td>
-        <td class="num">${fmtNum(suma(fs,'pendienteConBajas'), moneda)}</td>
         <td class="num">—</td><td class="num">—</td>`);
 
       resumenWrap.appendChild(bloque);
@@ -1994,6 +1990,51 @@
 
     renderBloqueMoneda('PESOS', filas.filter(f => f.moneda === 'PESOS'), 'Resumen en Pesos');
     renderBloqueMoneda('USD', filas.filter(f => f.moneda === 'USD'), 'Resumen en Dólares');
+
+    // ---------- Informe simple: ingresado y pendiente por año, en pesos y dólares ----------
+    const añosUnicos = [...new Set(filas.map(f => f.año))].sort();
+    const simpleWrap = el('div');
+    simpleWrap.style.cssText = 'margin-top:18px;';
+    const tituloSimple = el('div');
+    tituloSimple.style.cssText = 'font-family:"IBM Plex Serif",serif; font-weight:700; font-size:16px; color:var(--pine-dark); margin-bottom:6px;';
+    tituloSimple.textContent = 'Ingresos por Año';
+    simpleWrap.appendChild(tituloSimple);
+
+    const filasSimple = añosUnicos.map(año => {
+      const filasAño = filas.filter(f => f.año === año);
+      const filasPesos = filasAño.filter(f => f.moneda === 'PESOS');
+      const filasUsd = filasAño.filter(f => f.moneda === 'USD');
+      return {
+        año,
+        pasajerosPesos: suma(filasPesos, 'totalPasajerosPagaron'),
+        abonadoPesos: suma(filasPesos, 'totalAbonado'),
+        porAbonarPesos: suma(filasPesos, 'pendienteSinBajas'),
+        pasajerosUsd: suma(filasUsd, 'totalPasajerosPagaron'),
+        abonadoUsd: suma(filasUsd, 'totalAbonado'),
+        porAbonarUsd: suma(filasUsd, 'pendienteSinBajas'),
+      };
+    });
+
+    tablaResumen(simpleWrap, filasSimple, 'Ingresado y pendiente por año', [
+      { label: 'Año' },
+      { label: 'Pasajeros (Pesos)', num: true }, { label: 'Ingresó (Pesos)', num: true }, { label: 'Falta Ingresar (Pesos)', num: true },
+      { label: 'Pasajeros (USD)', num: true }, { label: 'Ingresó (USD)', num: true }, { label: 'Falta Ingresar (USD)', num: true }
+    ], f => `<td>${f.año}</td>
+      <td class="num">${f.pasajerosPesos}</td>
+      <td class="num">${fmtNum(f.abonadoPesos, 'PESOS')}</td>
+      <td class="num">${fmtNum(f.porAbonarPesos, 'PESOS')}</td>
+      <td class="num">${f.pasajerosUsd}</td>
+      <td class="num">${fmtNum(f.abonadoUsd, 'USD')}</td>
+      <td class="num">${fmtNum(f.porAbonarUsd, 'USD')}</td>`,
+    fs => `<td>TOTALES</td>
+      <td class="num">${suma(fs,'pasajerosPesos')}</td>
+      <td class="num">${fmtNum(suma(fs,'abonadoPesos'), 'PESOS')}</td>
+      <td class="num">${fmtNum(suma(fs,'porAbonarPesos'), 'PESOS')}</td>
+      <td class="num">${suma(fs,'pasajerosUsd')}</td>
+      <td class="num">${fmtNum(suma(fs,'abonadoUsd'), 'USD')}</td>
+      <td class="num">${fmtNum(suma(fs,'porAbonarUsd'), 'USD')}</td>`);
+
+    resumenWrap.appendChild(simpleWrap);
 
     container.appendChild(resumenWrap);
 
