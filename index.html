@@ -362,7 +362,7 @@
 <body>
 
 <div class="topbar">
-  <span class="version-badge">V20</span>
+  <span class="version-badge">V21</span>
   <div class="topbar-inner">
     <div class="brand-mark">
       <div class="glyph">CC</div>
@@ -1661,7 +1661,9 @@
               const calcV = (r.totalPorAbonar || 0) - (r.totalPagadoActivo || 0);
               const diff = Math.round((calcV - refV) * 100) / 100;
               if (Math.abs(diff) < 0.10) coinciden++;
-              else diffs.push({ cod, nombre: r.nombre, grupo: r.codGru, refV, calcV: Math.round(calcV*100)/100, diff, tieneFac: r.tieneFac });
+              // Los clientes Dado de Baja ya se muestran en su propia sección
+              // ("Clientes dados de baja"); no los duplicamos acá.
+              else if (r.estado !== 'DADO DE BAJA') diffs.push({ cod, nombre: r.nombre, grupo: r.codGru, refV, calcV: Math.round(calcV*100)/100, diff, tieneFac: r.tieneFac });
             });
             diffs.sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
             validation = { coinciden, total: refRows.length, diffs, noEnc, sheetRef: saldosSheetName };
