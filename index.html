@@ -362,7 +362,7 @@
 <body>
 
 <div class="topbar">
-  <span class="version-badge">V19</span>
+  <span class="version-badge">V20</span>
   <div class="topbar-inner">
     <div class="brand-mark">
       <div class="glyph">CC</div>
@@ -1107,6 +1107,7 @@
     saldosWb: null, saldosFileName: '', saldosSheetNames: [],
     mapping: {}, // cuentasSheetName -> saldosSheetName | ''
     results: {}, // sheetName -> {results, counts, validation}
+    gruposNoReconocidos: [], // [{codGru, nombre, code}]
     activeTab: null,
   };
 
@@ -1353,6 +1354,18 @@
     return /USD|DOLAR/i.test(sheetName) ? 'USD' : 'PESOS';
   }
 
+  // ---------- Detección de destino a partir del nombre del grupo ----------
+  // Patrón esperado: "AA-P-EGR-XXX-..." donde XXX es el código de 3 letras del destino.
+  const DESTINOS = { VCP: 'Villa Carlos Paz', BRC: 'Bariloche', CBW: 'Camboriú', CUN: 'Cancún' };
+  function getDestinoInfo(nombreGrupo) {
+    if (!nombreGrupo) return { label: 'Sin grupo', code: null, recognized: false };
+    const m = String(nombreGrupo).toUpperCase().match(/EGR-([A-Z]{2,5})/);
+    if (!m) return { label: 'Sin destino detectado', code: null, recognized: false };
+    const code = m[1];
+    if (DESTINOS[code]) return { label: DESTINOS[code], code, recognized: true };
+    return { label: code, code, recognized: false };
+  }
+
   function tokensOf(sheetName) {
     const upper = sheetName.toUpperCase();
     const yearMatch = upper.match(/\d{4}/);
@@ -1593,6 +1606,11 @@
           });
         }
 
+        // Destino por grupo (código de 3 letras dentro del nombre, ej: "EGR-CBW-...")
+        const codGruToNombre = {};
+        effectiveCondRaw.forEach(r => { codGruToNombre[String(r.COD_GRU).trim()] = r.NOMBRE_GRU; });
+        const gruposNoReconocidosMap = new Map(); // codGru -> {nombre, code}
+
         state.cuentasSheets.filter(s => s.checked).forEach(s => {
           const moneda = guessMoneda(s.name);
           const config = Object.assign({}, baseConfig, { moneda });
@@ -1600,6 +1618,17 @@
 
           // marcar beneficio por grupo
           res.forEach(r => { if (gruposLib.has(r.codGru)) r.esLib = true; });
+
+          // marcar destino por grupo
+          res.forEach(r => {
+            const nombreGru = codGruToNombre[r.codGru];
+            const destInfo = getDestinoInfo(nombreGru);
+            r.destino = destInfo.label;
+            r.destinoReconocido = destInfo.recognized;
+            if (!destInfo.recognized && !gruposNoReconocidosMap.has(r.codGru)) {
+              gruposNoReconocidosMap.set(r.codGru, { nombre: nombreGru || '(sin nombre)', code: destInfo.code });
+            }
+          });
 
           const counts = {
             'AL DIA': 0, 'DADO DE BAJA': 0, 'DEUDA SALDADA': 0, 'SIN PAGOS': 0,
@@ -1642,6 +1671,7 @@
         });
 
         state.results = results;
+        state.gruposNoReconocidos = Array.from(gruposNoReconocidosMap.entries()).map(([codGru, v]) => ({ codGru, nombre: v.nombre, code: v.code }));
         state.activeTab = Object.keys(results)[0] || null;
         renderResults();
       } catch (err) {
@@ -1825,36 +1855,45 @@
     resumenWrap.appendChild(h3Resumen);
     resumenWrap.appendChild(el('div', 'field-hint', 'Consolidado de todas las pestañas analizadas, separado por moneda.'));
 
-    const filas = sheetNames.map(n => {
+    const filas = [];
+    sheetNames.forEach(n => {
       const data = state.results[n];
       const res = data.results;
       const m = data.moneda;
       const [año] = n.split(' ');
 
-      // "Clientes activos" = Al Día + Sin Pagos (excluye Dados de Baja y Deuda Saldada,
-      // esta última tiene saldo $0 por definición).
-      const activos = res.filter(r => r.estado === 'AL DIA' || r.estado === 'SIN PAGOS');
-      const activosConBaja = res.filter(r => r.estado === 'AL DIA' || r.estado === 'SIN PAGOS' || r.estado === 'DADO DE BAJA');
+      // Agrupar clientes por destino dentro de esta pestaña
+      const porDestino = {};
+      res.forEach(r => {
+        const key = r.destino || 'Sin destino detectado';
+        if (!porDestino[key]) porDestino[key] = [];
+        porDestino[key].push(r);
+      });
 
-      const totalPasajerosPagaron = res.filter(r => (r.totalPagadoActivo || 0) > 0).length;
-      const totalAbonado = res.reduce((a, r) => a + (r.totalPagadoActivo || 0), 0);
-      const pendienteSinBajas = activos.reduce((a, r) => a + ((r.totalPorAbonar || 0) - (r.totalPagadoActivo || 0)), 0);
-      const pendienteConBajas = activosConBaja.reduce((a, r) => a + ((r.totalPorAbonar || 0) - (r.totalPagadoActivo || 0)), 0);
-      const pctCobrado = (totalAbonado + pendienteConBajas) > 0 ? totalAbonado / (totalAbonado + pendienteConBajas) : null;
-      const nActivos = activos.length;
-      const promSaldo = nActivos > 0 ? pendienteSinBajas / nActivos : null;
-      const fueraTermino = res.filter(r => (r.obs || '').includes('PAGO FUERA DE TÉRMINO')).length;
-      const gruposUnicos = new Set(res.map(r => r.codGru)).size;
+      Object.entries(porDestino).forEach(([destino, resDestino]) => {
+        const activos = resDestino.filter(r => r.estado === 'AL DIA' || r.estado === 'SIN PAGOS');
+        const activosConBaja = resDestino.filter(r => r.estado === 'AL DIA' || r.estado === 'SIN PAGOS' || r.estado === 'DADO DE BAJA');
+        const totalPasajerosPagaron = resDestino.filter(r => (r.totalPagadoActivo || 0) > 0).length;
+        const totalAbonado = resDestino.reduce((a, r) => a + (r.totalPagadoActivo || 0), 0);
+        const pendienteSinBajas = activos.reduce((a, r) => a + ((r.totalPorAbonar || 0) - (r.totalPagadoActivo || 0)), 0);
+        const pendienteConBajas = activosConBaja.reduce((a, r) => a + ((r.totalPorAbonar || 0) - (r.totalPagadoActivo || 0)), 0);
+        const pctCobrado = (totalAbonado + pendienteConBajas) > 0 ? totalAbonado / (totalAbonado + pendienteConBajas) : null;
+        const gruposUnicos = new Set(resDestino.map(r => r.codGru)).size;
 
-      return {
-        año, moneda: m,
-        alDia: data.counts['AL DIA'] || 0, baja: data.counts['DADO DE BAJA'] || 0,
-        saldada: data.counts['DEUDA SALDADA'] || 0, sinPagos: data.counts['SIN PAGOS'] || 0,
-        sorteo: data.counts['GANADOR SORTEO'] || 0, beneficios: data.counts['CON BENEFICIOS'] || 0,
-        totalClientes: res.length, grupos: gruposUnicos, totalPasajerosPagaron,
-        totalAbonado, pendienteSinBajas, pendienteConBajas, pctCobrado, promSaldo, fueraTermino,
-        nActivos
-      };
+        const alDia = resDestino.filter(r => r.estado === 'AL DIA' && !r.esLib).length;
+        const baja = resDestino.filter(r => r.estado === 'DADO DE BAJA' && !r.esLib).length;
+        const saldada = resDestino.filter(r => r.estado === 'DEUDA SALDADA' && !r.esLib).length;
+        const sinPagos = resDestino.filter(r => r.estado === 'SIN PAGOS' && !r.esLib).length;
+        const sorteo = resDestino.filter(r => r.estado === 'GANADOR SORTEO').length;
+        const beneficios = resDestino.filter(r => r.esLib).length;
+
+        filas.push({
+          año, moneda: m, destino,
+          alDia, baja, saldada, sinPagos, sorteo, beneficios,
+          totalClientes: resDestino.length, grupos: gruposUnicos, totalPasajerosPagaron,
+          totalAbonado, pendienteSinBajas, pendienteConBajas, pctCobrado
+        });
+      });
     });
 
     const suma = (arr, key) => arr.reduce((a, f) => a + (f[key] || 0), 0);
@@ -1881,8 +1920,9 @@
       wrapEl.appendChild(scroll);
     }
 
-    function renderBloqueMoneda(moneda, filasMoneda, nombreBloque) {
-      if (!filasMoneda.length) return;
+    function renderBloqueMoneda(moneda, filasMonedaSinOrden, nombreBloque) {
+      if (!filasMonedaSinOrden.length) return;
+      const filasMoneda = [...filasMonedaSinOrden].sort((a, b) => a.año.localeCompare(b.año) || a.destino.localeCompare(b.destino));
       const bloque = el('div');
       bloque.style.cssText = 'margin-top:18px;';
       const tituloBloque = el('div');
@@ -1891,30 +1931,30 @@
       bloque.appendChild(tituloBloque);
 
       tablaResumen(bloque, filasMoneda, 'Estados y composición de clientes', [
-        { label: 'Año' }, { label: 'Al Día', num: true }, { label: 'Baja', num: true },
+        { label: 'Año' }, { label: 'Destino' }, { label: 'Al Día', num: true }, { label: 'Baja', num: true },
         { label: 'Saldada', num: true }, { label: 'Sin Pagos', num: true }, { label: 'Sorteo', num: true },
         { label: 'Beneficios', num: true }, { label: 'Total Clientes', num: true }, { label: 'Grupos Empresarios', num: true }
-      ], f => `<td>${f.año}</td>
+      ], f => `<td>${f.año}</td><td>${f.destino}</td>
         <td class="num">${f.alDia}</td><td class="num">${f.baja}</td><td class="num">${f.saldada}</td>
         <td class="num">${f.sinPagos}</td><td class="num">${f.sorteo}</td><td class="num">${f.beneficios}</td>
         <td class="num">${f.totalClientes}</td><td class="num">${f.grupos}</td>`,
-      fs => `<td>TOTALES</td>
+      fs => `<td colspan="2">TOTALES</td>
         <td class="num">${suma(fs,'alDia')}</td><td class="num">${suma(fs,'baja')}</td><td class="num">${suma(fs,'saldada')}</td>
         <td class="num">${suma(fs,'sinPagos')}</td><td class="num">${suma(fs,'sorteo')}</td><td class="num">${suma(fs,'beneficios')}</td>
         <td class="num">${suma(fs,'totalClientes')}</td><td class="num">${suma(fs,'grupos')}</td>`);
 
       tablaResumen(bloque, filasMoneda, 'Montos por año', [
-        { label: 'Año' }, { label: 'Total de pasajeros', num: true }, { label: 'Total Abonado', num: true },
+        { label: 'Año' }, { label: 'Destino' }, { label: 'Total de pasajeros', num: true }, { label: 'Total Abonado', num: true },
         { label: 'Total por abonar (sin bajas)', num: true }, { label: 'Total por abonar (con bajas)', num: true },
         { label: '% Cobrado', num: true }, { label: '% Falta por Cobrar', num: true }
-      ], f => `<td>${f.año}</td>
+      ], f => `<td>${f.año}</td><td>${f.destino}</td>
         <td class="num">${f.totalPasajerosPagaron}</td>
         <td class="num">${fmtNum(f.totalAbonado, moneda)}</td>
         <td class="num">${fmtNum(f.pendienteSinBajas, moneda)}</td>
         <td class="num">${fmtNum(f.pendienteConBajas, moneda)}</td>
         <td class="num">${f.pctCobrado != null ? (f.pctCobrado * 100).toFixed(1) + '%' : '—'}</td>
         <td class="num">${f.pctCobrado != null ? ((1 - f.pctCobrado) * 100).toFixed(1) + '%' : '—'}</td>`,
-      fs => `<td>TOTALES</td>
+      fs => `<td colspan="2">TOTALES</td>
         <td class="num">${suma(fs,'totalPasajerosPagaron')}</td>
         <td class="num">${fmtNum(suma(fs,'totalAbonado'), moneda)}</td>
         <td class="num">${fmtNum(suma(fs,'pendienteSinBajas'), moneda)}</td>
@@ -1922,6 +1962,15 @@
         <td class="num">—</td><td class="num">—</td>`);
 
       resumenWrap.appendChild(bloque);
+    }
+
+    if (state.gruposNoReconocidos && state.gruposNoReconocidos.length) {
+      const warnDestino = el('div');
+      warnDestino.style.cssText = 'margin-bottom:18px; padding:12px 14px; background:rgba(184,134,43,0.12); border:1px solid rgba(184,134,43,0.4); border-radius:3px; font-size:13px; color:#8A6412;';
+      const codigosConocidos = Object.keys(DESTINOS).join(', ');
+      warnDestino.innerHTML = `⚠ ${state.gruposNoReconocidos.length} grupo(s) empresario(s) no tienen un código de destino reconocido (${codigosConocidos}). Revisá que el nombre del grupo esté bien tipeado:<br>` +
+        state.gruposNoReconocidos.map(g => `&nbsp;&nbsp;• Grupo ${g.codGru} — "${g.nombre}"${g.code ? ` (se detectó "${g.code}", no coincide con ningún destino conocido)` : ' (no se encontró ningún código después de "EGR-")'}`).join('<br>');
+      resumenWrap.appendChild(warnDestino);
     }
 
     renderBloqueMoneda('PESOS', filas.filter(f => f.moneda === 'PESOS'), 'Resumen en Pesos');
