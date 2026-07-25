@@ -362,7 +362,7 @@
 <body>
 
 <div class="topbar">
-  <span class="version-badge">V26</span>
+  <span class="version-badge">V27</span>
   <div class="topbar-inner">
     <div class="brand-mark">
       <div class="glyph">CC</div>
@@ -2205,7 +2205,34 @@
 
     resumenWrap.appendChild(simpleWrap);
 
-    container.appendChild(resumenWrap);
+    // ---------- Bloqueo con contraseña: el Resumen arranca contraído ----------
+    const RESUMEN_PASS = 'lcf21';
+    const lockWrap = el('div');
+    lockWrap.style.cssText = 'margin-top:30px;';
+    const lockCard = el('div');
+    lockCard.style.cssText = 'background:var(--resumen-bg); border:1px solid var(--resumen-border); border-radius:3px; padding:22px; box-shadow: var(--shadow); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;';
+    lockCard.innerHTML = `<div>
+        <div style="font-family:'IBM Plex Serif',serif; font-weight:700; font-size:16px; color:var(--pine-dark);">🔒 Resumen protegido</div>
+        <div class="field-hint" style="margin-top:4px;">Esta sección requiere contraseña para verse.</div>
+      </div>`;
+    const btnVerResumen = el('button', 'btn btn-primary', 'Ver Resumen');
+    btnVerResumen.type = 'button';
+    lockCard.appendChild(btnVerResumen);
+    lockWrap.appendChild(lockCard);
+    resumenWrap.style.display = 'none';
+    lockWrap.appendChild(resumenWrap);
+    btnVerResumen.addEventListener('click', () => {
+      const intento = prompt('Ingresá la contraseña para ver el Resumen:');
+      if (intento === null) return; // canceló
+      if (intento === RESUMEN_PASS) {
+        lockCard.style.display = 'none';
+        resumenWrap.style.display = 'block';
+      } else {
+        alert('Contraseña incorrecta.');
+      }
+    });
+
+    container.appendChild(lockWrap);
 
     // Botón descarga
     const dlWrap = el('div', 'toolbar-download');
