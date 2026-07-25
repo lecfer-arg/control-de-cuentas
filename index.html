@@ -362,7 +362,7 @@
 <body>
 
 <div class="topbar">
-  <span class="version-badge">V24</span>
+  <span class="version-badge">V25</span>
   <div class="topbar-inner">
     <div class="brand-mark">
       <div class="glyph">CC</div>
@@ -377,6 +377,24 @@
 
 <div class="wrap">
 
+  <!-- BARRA DE PROVINCIA (gobierna los 3 archivos) -->
+  <div class="step" id="step-provincia-bar">
+    <div class="step-body" style="padding:16px 22px; display:flex; align-items:flex-end; gap:18px; flex-wrap:wrap;">
+      <div class="field" style="margin-bottom:0; flex:1; min-width:220px;">
+        <label class="field-label">Provincia</label>
+        <select id="sel-provincia-global">
+          <option value="">— Elegí una provincia —</option>
+          <option value="TUCUMAN">Tucumán</option>
+          <option value="SALTA">Salta</option>
+          <option value="JUJUY">Jujuy</option>
+          <option value="CATAMARCA">Catamarca</option>
+        </select>
+        <div class="field-hint">Elegir una provincia trae automáticamente los archivos de cuentas y saldos guardados para ella.</div>
+      </div>
+      <button class="btn btn-ghost btn-small" id="btn-borrar-guardado" type="button">🗑 Borrar todo lo guardado</button>
+    </div>
+  </div>
+
   <!-- PASO 1: CONDICIONES -->
   <div class="step" id="step-cond">
     <div class="step-head">
@@ -385,6 +403,7 @@
       <div class="sub">Con una pestaña por provincia</div>
     </div>
     <div class="step-body">
+      <div id="condiciones-guardado-note" style="display:none; margin-bottom:14px; padding:10px 14px; background:rgba(47,82,51,0.08); border:1px solid rgba(47,82,51,0.25); border-radius:3px; font-size:13px; color:var(--pine-dark);"></div>
       <div class="dropzone" id="dz-condiciones">
         <div class="dz-icon">📑</div>
         <div class="dz-title">Arrastrá el Excel de condiciones o hacé clic para elegirlo</div>
@@ -418,6 +437,7 @@
       <div class="sub" id="step1-sub"></div>
     </div>
     <div class="step-body" id="step1-body">
+      <div id="cuentas-guardado-note" style="display:none; margin-bottom:14px; padding:10px 14px; background:rgba(47,82,51,0.08); border:1px solid rgba(47,82,51,0.25); border-radius:3px; font-size:13px; color:var(--pine-dark);"></div>
       <div class="dropzone" id="dz-cuentas">
         <div class="dz-icon">📂</div>
         <div class="dz-title">Arrastrá el Excel de cuentas o hacé clic para elegirlo</div>
@@ -456,6 +476,7 @@
       <div class="sub">Opcional — para validar</div>
     </div>
     <div class="step-body">
+      <div id="saldos-guardado-note" style="display:none; margin-bottom:14px; padding:10px 14px; background:rgba(47,82,51,0.08); border:1px solid rgba(47,82,51,0.25); border-radius:3px; font-size:13px; color:var(--pine-dark);"></div>
       <div class="dropzone" id="dz-saldos">
         <div class="dz-icon">📋</div>
         <div class="dz-title">Arrastrá el Excel de saldos o hacé clic para elegirlo</div>
@@ -1108,12 +1129,79 @@
     mapping: {}, // cuentasSheetName -> saldosSheetName | ''
     results: {}, // sheetName -> {results, counts, validation}
     gruposNoReconocidos: [], // [{codGru, nombre, code}]
+    provinciaActual: '',
     activeTab: null,
   };
 
   // ---------- Helpers DOM ----------
   const $ = (id) => document.getElementById(id);
   function el(tag, cls, html) { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
+
+  // ---------- Guardado persistente de archivos (IndexedDB) ----------
+  const DB_NAME = 'libro_control_db';
+  const DB_STORE = 'archivos';
+
+  function dbOpen() {
+    return new Promise((resolve, reject) => {
+      if (!window.indexedDB) { reject(new Error('IndexedDB no disponible en este navegador')); return; }
+      const req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = () => { req.result.createObjectStore(DB_STORE); };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async function dbSet(key, value) {
+    try {
+      const db = await dbOpen();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(DB_STORE, 'readwrite');
+        tx.objectStore(DB_STORE).put(value, key);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    } catch (e) { console.warn('No se pudo guardar en IndexedDB:', e); }
+  }
+  async function dbGet(key) {
+    try {
+      const db = await dbOpen();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(DB_STORE, 'readonly');
+        const req = tx.objectStore(DB_STORE).get(key);
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => reject(req.error);
+      });
+    } catch (e) { return null; }
+  }
+  async function dbDelete(key) {
+    try {
+      const db = await dbOpen();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(DB_STORE, 'readwrite');
+        tx.objectStore(DB_STORE).delete(key);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    } catch (e) { /* nada que borrar */ }
+  }
+  async function dbClearAll() {
+    try {
+      const db = await dbOpen();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(DB_STORE, 'readwrite');
+        tx.objectStore(DB_STORE).clear();
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    } catch (e) { /* nada que borrar */ }
+  }
+  function fmtFechaGuardado(iso) {
+    try {
+      const d = new Date(iso);
+      const dd = String(d.getDate()).padStart(2,'0'), mm = String(d.getMonth()+1).padStart(2,'0'), yy = d.getFullYear();
+      const hh = String(d.getHours()).padStart(2,'0'), mi = String(d.getMinutes()).padStart(2,'0');
+      return `${dd}/${mm}/${yy} ${hh}:${mi}hs`;
+    } catch (e) { return iso; }
+  }
 
   function fmtNum(v, moneda) {
     if (v === null || v === undefined || isNaN(v)) return '—';
@@ -1138,14 +1226,20 @@
       const reader = new FileReader();
       reader.onload = (e) => {
         try {
-          const data = new Uint8Array(e.target.result);
+          const buf = e.target.result;
+          const data = new Uint8Array(buf);
           const wb = XLSX.read(data, { type: 'array', cellDates: true });
-          resolve(wb);
+          resolve({ wb, bytes: buf });
         } catch (err) { reject(err); }
       };
       reader.onerror = reject;
       reader.readAsArrayBuffer(file);
     });
+  }
+
+  function workbookFromBytes(bytes) {
+    const data = new Uint8Array(bytes);
+    return XLSX.read(data, { type: 'array', cellDates: true });
   }
 
   function normalizeHeaderRow(ws) {
@@ -1208,45 +1302,69 @@
   const fileCondiciones = $('file-condiciones');
   bindDropzone(dzCondiciones, fileCondiciones, handleCondicionesFile);
 
+  function processCondicionesWorkbook(wb, fileName) {
+    state.condFileWb = wb;
+    state.condFileName = fileName;
+    state.condFileSheetNames = wb.SheetNames;
+    // Si ya había una provincia global elegida, tratar de mantenerla seleccionada
+    const matchGlobal = wb.SheetNames.find(n => n.toUpperCase() === state.provinciaActual);
+    state.condFileProvincia = matchGlobal || wb.SheetNames[0] || null;
+    state.condFileRaw = state.condFileProvincia ? loadCondRaw(wb.Sheets[state.condFileProvincia]) : [];
+
+    $('dz-condiciones').style.display = 'none';
+    $('condiciones-loaded').style.display = 'block';
+    $('condiciones-filename').textContent = fileName;
+    $('condiciones-meta').textContent = `${wb.SheetNames.length} provincia(s)`;
+
+    const sel = $('sel-provincia');
+    sel.innerHTML = '';
+    wb.SheetNames.forEach(n => {
+      const o = el('option', null, n); o.value = n;
+      if (n === state.condFileProvincia) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.onchange = () => {
+      state.condFileProvincia = sel.value || null;
+      state.condFileRaw = state.condFileProvincia ? loadCondRaw(wb.Sheets[state.condFileProvincia]) : [];
+      updateCondNotices();
+    };
+
+    updateCondNotices();
+  }
+
   async function handleCondicionesFile(file) {
     try {
-      const wb = await readWorkbook(file);
-      state.condFileWb = wb;
-      state.condFileName = file.name;
-      state.condFileSheetNames = wb.SheetNames;
-      state.condFileProvincia = wb.SheetNames[0] || null;
-      state.condFileRaw = state.condFileProvincia ? loadCondRaw(wb.Sheets[state.condFileProvincia]) : [];
-
-      $('dz-condiciones').style.display = 'none';
-      $('condiciones-loaded').style.display = 'block';
-      $('condiciones-filename').textContent = file.name;
-      $('condiciones-meta').textContent = `${wb.SheetNames.length} provincia(s)`;
-
-      const sel = $('sel-provincia');
-      sel.innerHTML = '';
-      wb.SheetNames.forEach(n => {
-        const o = el('option', null, n); o.value = n;
-        if (n === state.condFileProvincia) o.selected = true;
-        sel.appendChild(o);
-      });
-      sel.onchange = () => {
-        state.condFileProvincia = sel.value || null;
-        state.condFileRaw = state.condFileProvincia ? loadCondRaw(wb.Sheets[state.condFileProvincia]) : [];
-        updateCondNotices();
-      };
-
-      updateCondNotices();
+      const { wb, bytes } = await readWorkbook(file);
+      processCondicionesWorkbook(wb, file.name);
+      const savedAt = new Date().toISOString();
+      await dbSet('condiciones', { fileName: file.name, savedAt, bytes });
+      $('condiciones-guardado-note').style.display = 'block';
+      $('condiciones-guardado-note').textContent = `📦 Guardado para la próxima vez — usando "${file.name}", cargado el ${fmtFechaGuardado(savedAt)}.`;
     } catch (err) {
       alert('No se pudo leer el archivo de condiciones: ' + err.message);
     }
   }
 
-  $('condiciones-remove').addEventListener('click', () => {
+  async function autoLoadCondiciones() {
+    const saved = await dbGet('condiciones');
+    if (!saved) return;
+    try {
+      const wb = workbookFromBytes(saved.bytes);
+      processCondicionesWorkbook(wb, saved.fileName);
+      $('condiciones-guardado-note').style.display = 'block';
+      $('condiciones-guardado-note').textContent = `📦 Usando archivo "${saved.fileName}" cargado el ${fmtFechaGuardado(saved.savedAt)}. Subí uno nuevo para reemplazarlo.`;
+      updateAnalizarState();
+    } catch (err) { console.warn('No se pudo restaurar el archivo de condiciones guardado:', err); }
+  }
+
+  $('condiciones-remove').addEventListener('click', async () => {
     state.condFileWb = null; state.condFileName = ''; state.condFileSheetNames = [];
     state.condFileProvincia = null; state.condFileRaw = [];
     $('dz-condiciones').style.display = 'block';
     $('condiciones-loaded').style.display = 'none';
     $('file-condiciones').value = '';
+    $('condiciones-guardado-note').style.display = 'none';
+    await dbDelete('condiciones'); // limpia lo guardado, la próxima carga será nueva
     updateCondNotices();
   });
 
@@ -1390,28 +1508,62 @@
 
   bindDropzone(dzCuentas, fileCuentas, handleCuentasFile);
 
+  function processCuentasWorkbook(wb, fileName) {
+    state.cuentasWb = wb;
+    state.cuentasFileName = fileName;
+    const condName = guessCondSheet(wb.SheetNames);
+    state.condSheetName = condName;
+    state.condRaw = condName ? loadCondRaw(wb.Sheets[condName]) : [];
+
+    state.cuentasSheets = wb.SheetNames
+      .filter(n => n !== condName)
+      .map(n => {
+        const rows = loadCuentasSheetRows(wb.Sheets[n]);
+        return { name: n, rows, checked: rows.length > 0 };
+      });
+
+    renderCuentasLoaded();
+    renderMappingRows();
+    updateAnalizarState();
+  }
+
   async function handleCuentasFile(file) {
     try {
-      const wb = await readWorkbook(file);
-      state.cuentasWb = wb;
-      state.cuentasFileName = file.name;
-      const condName = guessCondSheet(wb.SheetNames);
-      state.condSheetName = condName;
-      state.condRaw = condName ? loadCondRaw(wb.Sheets[condName]) : [];
-
-      state.cuentasSheets = wb.SheetNames
-        .filter(n => n !== condName)
-        .map(n => {
-          const rows = loadCuentasSheetRows(wb.Sheets[n]);
-          return { name: n, rows, checked: rows.length > 0 };
-        });
-
-      renderCuentasLoaded();
-      renderMappingRows();
-      updateAnalizarState();
+      const { wb, bytes } = await readWorkbook(file);
+      processCuentasWorkbook(wb, file.name);
+      if (state.provinciaActual) {
+        const savedAt = new Date().toISOString();
+        await dbSet(`cuentas_${state.provinciaActual}`, { fileName: file.name, savedAt, bytes });
+        $('cuentas-guardado-note').style.display = 'block';
+        $('cuentas-guardado-note').textContent = `📦 Guardado para ${state.provinciaActual} — usando "${file.name}", cargado el ${fmtFechaGuardado(savedAt)}.`;
+      }
     } catch (err) {
       alert('No se pudo leer el archivo de cuentas: ' + err.message);
     }
+  }
+
+  async function autoLoadCuentas(provincia) {
+    const saved = await dbGet(`cuentas_${provincia}`);
+    $('cuentas-guardado-note').style.display = 'none';
+    if (!saved) return false;
+    try {
+      const wb = workbookFromBytes(saved.bytes);
+      processCuentasWorkbook(wb, saved.fileName);
+      $('cuentas-guardado-note').style.display = 'block';
+      $('cuentas-guardado-note').textContent = `📦 Usando archivo "${saved.fileName}" de ${provincia}, cargado el ${fmtFechaGuardado(saved.savedAt)}. Subí uno nuevo para reemplazarlo.`;
+      return true;
+    } catch (err) { console.warn('No se pudo restaurar el archivo de cuentas guardado:', err); return false; }
+  }
+
+  function limpiarCuentas() {
+    state.cuentasWb = null; state.cuentasFileName = ''; state.cuentasSheets = [];
+    state.condSheetName = null; state.condRaw = [];
+    $('dz-cuentas').style.display = 'block';
+    $('cuentas-loaded').style.display = 'none';
+    $('file-cuentas').value = '';
+    $('cuentas-guardado-note').style.display = 'none';
+    renderMappingRows();
+    updateAnalizarState();
   }
 
   function renderCuentasLoaded() {
@@ -1465,14 +1617,9 @@
     });
   }
 
-  $('cuentas-remove').addEventListener('click', () => {
-    state.cuentasWb = null; state.cuentasFileName = ''; state.cuentasSheets = [];
-    state.condSheetName = null; state.condRaw = [];
-    $('dz-cuentas').style.display = 'block';
-    $('cuentas-loaded').style.display = 'none';
-    $('file-cuentas').value = '';
-    renderMappingRows();
-    updateAnalizarState();
+  $('cuentas-remove').addEventListener('click', async () => {
+    limpiarCuentas();
+    if (state.provinciaActual) await dbDelete(`cuentas_${state.provinciaActual}`);
   });
 
   // ---------- Paso 2: saldos ----------
@@ -1481,28 +1628,57 @@
   const fileSaldos = $('file-saldos');
   bindDropzone(dzSaldos, fileSaldos, handleSaldosFile);
 
+  function processSaldosWorkbook(wb, fileName) {
+    state.saldosWb = wb;
+    state.saldosFileName = fileName;
+    state.saldosSheetNames = wb.SheetNames;
+    $('dz-saldos').style.display = 'none';
+    $('saldos-loaded').style.display = 'block';
+    $('saldos-filename').textContent = fileName;
+    $('saldos-meta').textContent = `${wb.SheetNames.length} pestañas`;
+    renderMappingRows();
+  }
+
   async function handleSaldosFile(file) {
     try {
-      const wb = await readWorkbook(file);
-      state.saldosWb = wb;
-      state.saldosFileName = file.name;
-      state.saldosSheetNames = wb.SheetNames;
-      $('dz-saldos').style.display = 'none';
-      $('saldos-loaded').style.display = 'block';
-      $('saldos-filename').textContent = file.name;
-      $('saldos-meta').textContent = `${wb.SheetNames.length} pestañas`;
-      renderMappingRows();
+      const { wb, bytes } = await readWorkbook(file);
+      processSaldosWorkbook(wb, file.name);
+      if (state.provinciaActual) {
+        const savedAt = new Date().toISOString();
+        await dbSet(`saldos_${state.provinciaActual}`, { fileName: file.name, savedAt, bytes });
+        $('saldos-guardado-note').style.display = 'block';
+        $('saldos-guardado-note').textContent = `📦 Guardado para ${state.provinciaActual} — usando "${file.name}", cargado el ${fmtFechaGuardado(savedAt)}.`;
+      }
     } catch (err) {
       alert('No se pudo leer el archivo de saldos: ' + err.message);
     }
   }
 
-  $('saldos-remove').addEventListener('click', () => {
+  async function autoLoadSaldos(provincia) {
+    const saved = await dbGet(`saldos_${provincia}`);
+    $('saldos-guardado-note').style.display = 'none';
+    if (!saved) return false;
+    try {
+      const wb = workbookFromBytes(saved.bytes);
+      processSaldosWorkbook(wb, saved.fileName);
+      $('saldos-guardado-note').style.display = 'block';
+      $('saldos-guardado-note').textContent = `📦 Usando archivo "${saved.fileName}" de ${provincia}, cargado el ${fmtFechaGuardado(saved.savedAt)}. Subí uno nuevo para reemplazarlo.`;
+      return true;
+    } catch (err) { console.warn('No se pudo restaurar el archivo de saldos guardado:', err); return false; }
+  }
+
+  function limpiarSaldos() {
     state.saldosWb = null; state.saldosFileName = ''; state.saldosSheetNames = []; state.mapping = {};
     $('dz-saldos').style.display = 'block';
     $('saldos-loaded').style.display = 'none';
     $('file-saldos').value = '';
+    $('saldos-guardado-note').style.display = 'none';
     renderMappingRows();
+  }
+
+  $('saldos-remove').addEventListener('click', async () => {
+    limpiarSaldos();
+    if (state.provinciaActual) await dbDelete(`saldos_${state.provinciaActual}`);
   });
 
   function renderMappingRows() {
@@ -2111,6 +2287,47 @@
     const fname = `${config.nombreInforme.replace(/[^\w\-]+/g, '_')}_analizado.xlsx`;
     XLSX.writeFile(wb, fname);
   }
+
+  // ---------- Selector global de Provincia (gobierna los 3 archivos guardados) ----------
+
+  $('sel-provincia-global').addEventListener('change', async (e) => {
+    const prov = e.target.value;
+    state.provinciaActual = prov;
+
+    if (!prov) {
+      limpiarCuentas();
+      limpiarSaldos();
+      return;
+    }
+
+    // Si el archivo de condiciones ya está cargado, tratar de pararse en la pestaña correspondiente
+    if (state.condFileWb) {
+      const match = state.condFileWb.SheetNames.find(n => n.toUpperCase() === prov);
+      if (match) {
+        state.condFileProvincia = match;
+        state.condFileRaw = loadCondRaw(state.condFileWb.Sheets[match]);
+        const sel = $('sel-provincia');
+        if (sel) sel.value = match;
+        updateCondNotices();
+      }
+    }
+
+    // Traer automáticamente cuentas y saldos guardados para esta provincia (si existen)
+    const tengoC = await autoLoadCuentas(prov);
+    if (!tengoC) limpiarCuentas();
+    const tengoS = await autoLoadSaldos(prov);
+    if (!tengoS) limpiarSaldos();
+  });
+
+  $('btn-borrar-guardado').addEventListener('click', async () => {
+    const ok = confirm('Esto borra todos los archivos guardados (condiciones, cuentas y saldos de las 4 provincias). No afecta a los archivos en tu computadora. ¿Confirmás?');
+    if (!ok) return;
+    await dbClearAll();
+    location.reload();
+  });
+
+  // Al iniciar la página, intentar restaurar el archivo de condiciones guardado
+  autoLoadCondiciones();
 
 })();
 </script>
