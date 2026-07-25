@@ -362,7 +362,7 @@
 <body>
 
 <div class="topbar">
-  <span class="version-badge">V23</span>
+  <span class="version-badge">V24</span>
   <div class="topbar-inner">
     <div class="brand-mark">
       <div class="glyph">CC</div>
@@ -2015,24 +2015,34 @@
       };
     });
 
-    tablaResumen(simpleWrap, filasSimple, 'Ingresado y pendiente por año', [
-      { label: 'Año' },
-      { label: 'Pasajeros (Pesos)', num: true }, { label: 'Ingresó (Pesos)', num: true }, { label: 'Falta Ingresar (Pesos)', num: true },
-      { label: 'Pasajeros (USD)', num: true }, { label: 'Ingresó (USD)', num: true }, { label: 'Falta Ingresar (USD)', num: true }
-    ], f => `<td>${f.año}</td>
-      <td class="num">${f.pasajerosPesos}</td>
-      <td class="num">${fmtNum(f.abonadoPesos, 'PESOS')}</td>
-      <td class="num">${fmtNum(f.porAbonarPesos, 'PESOS')}</td>
-      <td class="num">${f.pasajerosUsd}</td>
-      <td class="num">${fmtNum(f.abonadoUsd, 'USD')}</td>
-      <td class="num">${fmtNum(f.porAbonarUsd, 'USD')}</td>`,
-    fs => `<td>TOTALES</td>
-      <td class="num">${suma(fs,'pasajerosPesos')}</td>
-      <td class="num">${fmtNum(suma(fs,'abonadoPesos'), 'PESOS')}</td>
-      <td class="num">${fmtNum(suma(fs,'porAbonarPesos'), 'PESOS')}</td>
-      <td class="num">${suma(fs,'pasajerosUsd')}</td>
-      <td class="num">${fmtNum(suma(fs,'abonadoUsd'), 'USD')}</td>
-      <td class="num">${fmtNum(suma(fs,'porAbonarUsd'), 'USD')}</td>`);
+    const filasSimplePesos = filasSimple.filter(f => f.pasajerosPesos > 0 || f.abonadoPesos !== 0 || f.porAbonarPesos !== 0);
+    const filasSimpleUsd = filasSimple.filter(f => f.pasajerosUsd > 0 || f.abonadoUsd !== 0 || f.porAbonarUsd !== 0);
+
+    if (filasSimplePesos.length) {
+      tablaResumen(simpleWrap, filasSimplePesos, 'Ingresado y pendiente por año — Pesos', [
+        { label: 'Año' }, { label: 'Pasajeros', num: true }, { label: 'Ingresó', num: true }, { label: 'Falta Ingresar', num: true }
+      ], f => `<td>${f.año}</td>
+        <td class="num">${f.pasajerosPesos}</td>
+        <td class="num">${fmtNum(f.abonadoPesos, 'PESOS')}</td>
+        <td class="num">${fmtNum(f.porAbonarPesos, 'PESOS')}</td>`,
+      fs => `<td>TOTALES</td>
+        <td class="num">${suma(fs,'pasajerosPesos')}</td>
+        <td class="num">${fmtNum(suma(fs,'abonadoPesos'), 'PESOS')}</td>
+        <td class="num">${fmtNum(suma(fs,'porAbonarPesos'), 'PESOS')}</td>`);
+    }
+
+    if (filasSimpleUsd.length) {
+      tablaResumen(simpleWrap, filasSimpleUsd, 'Ingresado y pendiente por año — Dólares', [
+        { label: 'Año' }, { label: 'Pasajeros', num: true }, { label: 'Ingresó', num: true }, { label: 'Falta Ingresar', num: true }
+      ], f => `<td>${f.año}</td>
+        <td class="num">${f.pasajerosUsd}</td>
+        <td class="num">${fmtNum(f.abonadoUsd, 'USD')}</td>
+        <td class="num">${fmtNum(f.porAbonarUsd, 'USD')}</td>`,
+      fs => `<td>TOTALES</td>
+        <td class="num">${suma(fs,'pasajerosUsd')}</td>
+        <td class="num">${fmtNum(suma(fs,'abonadoUsd'), 'USD')}</td>
+        <td class="num">${fmtNum(suma(fs,'porAbonarUsd'), 'USD')}</td>`);
+    }
 
     resumenWrap.appendChild(simpleWrap);
 
