@@ -362,7 +362,7 @@
 <body>
 
 <div class="topbar">
-  <span class="version-badge">V27</span>
+  <span class="version-badge">V28</span>
   <div class="topbar-inner">
     <div class="brand-mark">
       <div class="glyph">CC</div>
@@ -389,118 +389,16 @@
           <option value="JUJUY">Jujuy</option>
           <option value="CATAMARCA">Catamarca</option>
         </select>
-        <div class="field-hint">Elegir una provincia trae automáticamente los archivos de cuentas y saldos guardados para ella.</div>
+        <div class="field-hint">Trae automáticamente las cuentas, saldos y condiciones desde Google Sheets.</div>
       </div>
       <div class="field" style="margin-bottom:0; flex:1; min-width:180px;">
         <label class="field-label">Mes de evaluación</label>
         <input type="month" id="cfg-lasteval" />
         <div class="field-hint">Hasta qué mes se evalúa el cumplimiento de la cuota mínima.</div>
       </div>
-      <button class="btn btn-ghost btn-small" id="btn-borrar-guardado" type="button">🗑 Borrar todo lo guardado</button>
+      <button class="btn btn-primary btn-small" id="btn-actualizar" type="button" disabled>⟳ Actualizar</button>
     </div>
-  </div>
-
-  <!-- PASO 1: CONDICIONES -->
-  <div class="step" id="step-cond">
-    <div class="step-head">
-      <div class="step-num">1</div>
-      <h2>Archivo de condiciones</h2>
-      <div class="sub">Con una pestaña por provincia</div>
-    </div>
-    <div class="step-body">
-      <div id="condiciones-guardado-note" style="display:none; margin-bottom:14px; padding:10px 14px; background:rgba(47,82,51,0.08); border:1px solid rgba(47,82,51,0.25); border-radius:3px; font-size:13px; color:var(--pine-dark);"></div>
-      <div class="dropzone" id="dz-condiciones">
-        <div class="dz-icon">📑</div>
-        <div class="dz-title">Arrastrá el Excel de condiciones o hacé clic para elegirlo</div>
-        <div class="dz-sub">Una pestaña por provincia (ej: TUCUMAN, SALTA, JUJUY, CATAMARCA), con columnas Código de grupo, Nombre de grupo y Condición</div>
-        <input type="file" id="file-condiciones" accept=".xlsx,.xls" />
-      </div>
-      <div id="condiciones-loaded" style="display:none;">
-        <div class="file-chip">
-          <span>📄</span>
-          <span class="name" id="condiciones-filename"></span>
-          <span class="meta" id="condiciones-meta"></span>
-          <button class="remove" id="condiciones-remove">Quitar</button>
-        </div>
-        <div class="field" style="margin-top:16px;">
-          <label class="field-label">Provincia a utilizar</label>
-          <select id="sel-provincia"></select>
-          <div class="field-hint">Elegí la pestaña que corresponde al archivo de cuentas que vas a analizar.</div>
-        </div>
-      </div>
-      <div class="field-hint" style="margin-top:14px;">
-        ¿No tenés un archivo de condiciones separado? No hay problema — si el archivo de cuentas trae su propia pestaña CONDICIONES u OBSERVACIONES, la vamos a usar automáticamente en el paso siguiente.
-      </div>
-    </div>
-  </div>
-
-  <!-- PASO 2: CUENTAS -->
-  <div class="step" id="step1">
-    <div class="step-head">
-      <div class="step-num">2</div>
-      <h2>Archivo de cuentas a analizar</h2>
-      <div class="sub" id="step1-sub"></div>
-    </div>
-    <div class="step-body" id="step1-body">
-      <div id="cuentas-guardado-note" style="display:none; margin-bottom:14px; padding:10px 14px; background:rgba(47,82,51,0.08); border:1px solid rgba(47,82,51,0.25); border-radius:3px; font-size:13px; color:var(--pine-dark);"></div>
-      <div class="dropzone" id="dz-cuentas">
-        <div class="dz-icon">📂</div>
-        <div class="dz-title">Arrastrá el Excel de cuentas o hacé clic para elegirlo</div>
-        <div class="dz-sub">Una pestaña por año y moneda. Si no trae su propia pestaña de condiciones, usá el archivo de condiciones del paso 1</div>
-        <input type="file" id="file-cuentas" accept=".xlsx,.xls" />
-      </div>
-      <div id="cuentas-loaded" style="display:none;">
-        <div class="file-chip">
-          <span>📄</span>
-          <span class="name" id="cuentas-filename"></span>
-          <span class="meta" id="cuentas-meta"></span>
-          <button class="remove" id="cuentas-remove">Quitar</button>
-        </div>
-        <div id="cond-source-note" style="display:none; margin-top:14px; padding:10px 14px; background:rgba(30,111,92,0.10); border:1px solid rgba(30,111,92,0.3); border-radius:3px; font-size:13px; color:var(--stamp-teal);"></div>
-        <div id="cond-warning" style="display:none; margin-top:14px; padding:12px 14px; background:rgba(162,59,46,0.10); border:1px solid rgba(162,59,46,0.35); border-radius:3px; font-size:13px; color:var(--stamp-red-dark);">
-          ⚠ No se detectó una pestaña de condiciones (ni en el archivo del paso 1 ni dentro de este archivo). <strong>Sin condiciones, la cuota mínima se calculará en $0 para todos los clientes.</strong> Subí el archivo de condiciones en el paso 1, o elegí la pestaña correcta abajo si está dentro de este mismo archivo.
-        </div>
-        <div class="field" id="wrap-sel-condiciones" style="margin-top:16px;">
-          <label class="field-label">Pestaña de condiciones dentro de este archivo (alternativa)</label>
-          <select id="sel-condiciones"></select>
-          <div class="field-hint">Solo se usa si no elegiste una provincia en el paso 1.</div>
-        </div>
-        <div class="field">
-          <label class="field-label">Pestañas de cuentas a incluir</label>
-          <div class="folder-tabs" id="cuentas-sheets-list"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- PASO 3: SALDOS -->
-  <div class="step" id="step2">
-    <div class="step-head">
-      <div class="step-num">3</div>
-      <h2>Archivo de saldos de referencia</h2>
-      <div class="sub">Opcional — para validar</div>
-    </div>
-    <div class="step-body">
-      <div id="saldos-guardado-note" style="display:none; margin-bottom:14px; padding:10px 14px; background:rgba(47,82,51,0.08); border:1px solid rgba(47,82,51,0.25); border-radius:3px; font-size:13px; color:var(--pine-dark);"></div>
-      <div class="dropzone" id="dz-saldos">
-        <div class="dz-icon">📋</div>
-        <div class="dz-title">Arrastrá el Excel de saldos o hacé clic para elegirlo</div>
-        <div class="dz-sub">Columnas esperadas: COD_CLIENT, RAZON_SOCI, SALDO — una pestaña por año/moneda o una única hoja</div>
-        <input type="file" id="file-saldos" accept=".xlsx,.xls" />
-      </div>
-      <div id="saldos-loaded" style="display:none;">
-        <div class="file-chip">
-          <span>📄</span>
-          <span class="name" id="saldos-filename"></span>
-          <span class="meta" id="saldos-meta"></span>
-          <button class="remove" id="saldos-remove">Quitar</button>
-        </div>
-        <div class="field" style="margin-top:16px;">
-          <label class="field-label">Relación entre pestañas de cuentas y de saldos</label>
-          <div id="mapping-rows"></div>
-        </div>
-      </div>
-    </div>
+    <div id="carga-estado" style="display:none; margin:0 22px 16px; padding:10px 14px; border-radius:3px; font-size:13px;"></div>
   </div>
 
   <button class="btn-analizar" id="btn-analizar" disabled>Analizar cuentas</button>
@@ -1106,11 +1004,9 @@
   'use strict';
 
   const state = {
-    cuentasWb: null, cuentasFileName: '', cuentasSheets: [], // [{name, rows, checked}]
-    condSheetName: null, condRaw: [], // condiciones detectadas DENTRO del archivo de cuentas (alternativa)
-    condFileWb: null, condFileName: '', condFileSheetNames: [], condFileProvincia: null, condFileRaw: [], // archivo de condiciones separado
-    saldosWb: null, saldosFileName: '', saldosSheetNames: [],
-    mapping: {}, // cuentasSheetName -> saldosSheetName | ''
+    cuentasSheets: [], // [{name, rows, checked}]
+    condFileProvincia: null, condFileRaw: [], // condiciones de la provincia elegida (desde Google Sheets)
+    saldosPorHoja: {}, // cuentasSheetName -> [{COD_CLIENT, RAZON_SOCI, SALDO}] (desde pestañas "SL ...")
     results: {}, // sheetName -> {results, counts, validation}
     gruposNoReconocidos: [], // [{codGru, nombre, code}]
     provinciaActual: '',
@@ -1121,70 +1017,40 @@
   const $ = (id) => document.getElementById(id);
   function el(tag, cls, html) { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
 
-  // ---------- Guardado persistente de archivos (IndexedDB) ----------
-  const DB_NAME = 'libro_control_db';
-  const DB_STORE = 'archivos';
+  // ---------- Conexión con Google Sheets ----------
+  const GS_API_KEY = 'AIzaSyCjAZSkehBG17XkbLMshD4ASUpuEer-KkY';
+  const GS_SHEET_IDS = {
+    CONDICIONES: '1o-WyiLxekGhmI-tT9o8K3_0DFvYi9yTAq7rLck7rQ8Q',
+    TUCUMAN: '1R2FJC5kY3v4PPvZKsUgyerhimi4JcSbzoCIJc6Om2iE',
+    SALTA: '17rWSNP0WXxRVNhg5wugQkmyE6Do5L14ApVmSL-D2Kts',
+    JUJUY: '1mkAzGsu8Hm27dNV5u2EWJ-U5cvCM12QfiQsvLbcLnHs',
+    CATAMARCA: '1xgG2eoMs_RZM_3qFOcy-1QdOqcatwfcRGvHTSxGNYD0',
+  };
 
-  function dbOpen() {
-    return new Promise((resolve, reject) => {
-      if (!window.indexedDB) { reject(new Error('IndexedDB no disponible en este navegador')); return; }
-      const req = indexedDB.open(DB_NAME, 1);
-      req.onupgradeneeded = () => { req.result.createObjectStore(DB_STORE); };
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
-    });
+  async function gsFetchSheetTitles(spreadsheetId) {
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?key=${GS_API_KEY}&fields=sheets.properties.title`;
+    const resp = await fetch(url);
+    if (!resp.ok) {
+      const body = await resp.json().catch(() => ({}));
+      throw new Error(`No se pudo obtener la lista de pestañas (HTTP ${resp.status}) ${body.error ? body.error.message : ''}`);
+    }
+    const data = await resp.json();
+    return (data.sheets || []).map(s => s.properties.title);
   }
-  async function dbSet(key, value) {
-    try {
-      const db = await dbOpen();
-      return new Promise((resolve, reject) => {
-        const tx = db.transaction(DB_STORE, 'readwrite');
-        tx.objectStore(DB_STORE).put(value, key);
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
-      });
-    } catch (e) { console.warn('No se pudo guardar en IndexedDB:', e); }
-  }
-  async function dbGet(key) {
-    try {
-      const db = await dbOpen();
-      return new Promise((resolve, reject) => {
-        const tx = db.transaction(DB_STORE, 'readonly');
-        const req = tx.objectStore(DB_STORE).get(key);
-        req.onsuccess = () => resolve(req.result || null);
-        req.onerror = () => reject(req.error);
-      });
-    } catch (e) { return null; }
-  }
-  async function dbDelete(key) {
-    try {
-      const db = await dbOpen();
-      return new Promise((resolve, reject) => {
-        const tx = db.transaction(DB_STORE, 'readwrite');
-        tx.objectStore(DB_STORE).delete(key);
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
-      });
-    } catch (e) { /* nada que borrar */ }
-  }
-  async function dbClearAll() {
-    try {
-      const db = await dbOpen();
-      return new Promise((resolve, reject) => {
-        const tx = db.transaction(DB_STORE, 'readwrite');
-        tx.objectStore(DB_STORE).clear();
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
-      });
-    } catch (e) { /* nada que borrar */ }
-  }
-  function fmtFechaGuardado(iso) {
-    try {
-      const d = new Date(iso);
-      const dd = String(d.getDate()).padStart(2,'0'), mm = String(d.getMonth()+1).padStart(2,'0'), yy = d.getFullYear();
-      const hh = String(d.getHours()).padStart(2,'0'), mi = String(d.getMinutes()).padStart(2,'0');
-      return `${dd}/${mm}/${yy} ${hh}:${mi}hs`;
-    } catch (e) { return iso; }
+
+  async function gsFetchValuesBatch(spreadsheetId, sheetNames) {
+    if (!sheetNames.length) return {};
+    const params = sheetNames.map(n => `ranges=${encodeURIComponent(n)}`).join('&');
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchGet?${params}&valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=SERIAL_NUMBER&key=${GS_API_KEY}`;
+    const resp = await fetch(url);
+    if (!resp.ok) {
+      const body = await resp.json().catch(() => ({}));
+      throw new Error(`No se pudieron leer las pestañas (HTTP ${resp.status}) ${body.error ? body.error.message : ''}`);
+    }
+    const data = await resp.json();
+    const out = {};
+    (data.valueRanges || []).forEach((vr, i) => { out[sheetNames[i]] = vr.values || []; });
+    return out;
   }
 
   function fmtNum(v, moneda) {
@@ -1203,194 +1069,61 @@
     return arr.map(ym => `${String(ym[1]).padStart(2, '0')}/${ym[0]}`).join(', ');
   }
 
-  // ---------- Lectura de archivos ----------
+  // ---------- Conversión de filas (Google Sheets values -> objetos que ya entiende el motor) ----------
 
-  function readWorkbook(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const buf = e.target.result;
-          const data = new Uint8Array(buf);
-          const wb = XLSX.read(data, { type: 'array', cellDates: true });
-          resolve({ wb, bytes: buf });
-        } catch (err) { reject(err); }
-      };
-      reader.onerror = reject;
-      reader.readAsArrayBuffer(file);
-    });
-  }
-
-  function workbookFromBytes(bytes) {
-    const data = new Uint8Array(bytes);
-    return XLSX.read(data, { type: 'array', cellDates: true });
-  }
-
-  function normalizeHeaderRow(ws) {
-    // Devuelve filas como objetos usando cabeceras trimmeadas
-    const json = XLSX.utils.sheet_to_json(ws, { raw: true, defval: null });
-    return json;
-  }
-
-  function loadCuentasSheetRows(ws) {
-    const json = normalizeHeaderRow(ws);
-    return json
-      .filter(r => r.COD_CLI !== null && r.COD_CLI !== undefined && String(r.COD_CLI).trim() !== '')
-      .map(r => ({
-        COD_CLI: r.COD_CLI, COD_GRU: r.COD_GRU, RAZON_SOC: r.RAZON_SOC,
-        FECHA_EMIS: LedgerLogic.parseDate(r.FECHA_EMIS), T_COMP: r.T_COMP,
-        DEBE: typeof r.DEBE === 'string' ? (LedgerLogic.toF(r.DEBE) || 0) : (r.DEBE || 0),
-        HABER: typeof r.HABER === 'string' ? (LedgerLogic.toF(r.HABER) || 0) : (r.HABER || 0),
-        SALDO: typeof r.SALDO === 'string' ? (LedgerLogic.toF(r.SALDO) || 0) : (r.SALDO || 0),
-      }))
-      .filter(r => r.FECHA_EMIS !== null && r.T_COMP);
-  }
-
-  function guessCondSheet(sheetNames) {
-    const norm = (s) => String(s).trim().toUpperCase();
-    const targets = ['CONDICIONES', 'OBSERVACIONES', 'CONDICION', 'CONDICIONES DE PAGO', 'OBSERVACION'];
-    for (const t of targets) {
-      const found = sheetNames.find(n => norm(n) === t);
-      if (found) return found;
-    }
-    // Heurística de respaldo: buscar una pestaña sin columna COD_CLI que tenga
-    // al menos 2 columnas de texto (probable pestaña de condiciones con otro nombre)
-    return null;
-  }
-
-  function getEffectiveCondRaw() {
-    // Prioridad: archivo de condiciones separado (paso 1) > pestaña dentro del archivo de cuentas
-    if (state.condFileProvincia && state.condFileRaw.length) {
-      return { condRaw: state.condFileRaw, source: `archivo de condiciones — ${state.condFileProvincia}` };
-    }
-    if (state.condSheetName && state.condRaw.length) {
-      return { condRaw: state.condRaw, source: `pestaña "${state.condSheetName}" del archivo de cuentas` };
-    }
-    return { condRaw: [], source: null };
-  }
-
-  // ---------- Paso 0: archivo de condiciones (separado, por provincia) ----------
-
-  function bindDropzone(dz, input, onFile) {
-    dz.addEventListener('click', () => input.click());
-    dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.classList.add('drag'); });
-    dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
-    dz.addEventListener('drop', (e) => {
-      e.preventDefault(); dz.classList.remove('drag');
-      if (e.dataTransfer.files.length) onFile(e.dataTransfer.files[0]);
-    });
-    input.addEventListener('change', () => { if (input.files.length) onFile(input.files[0]); });
-  }
-
-  const dzCondiciones = $('dz-condiciones');
-  const fileCondiciones = $('file-condiciones');
-  bindDropzone(dzCondiciones, fileCondiciones, handleCondicionesFile);
-
-  function processCondicionesWorkbook(wb, fileName) {
-    state.condFileWb = wb;
-    state.condFileName = fileName;
-    state.condFileSheetNames = wb.SheetNames;
-    // Si ya había una provincia global elegida, tratar de mantenerla seleccionada
-    const matchGlobal = wb.SheetNames.find(n => n.toUpperCase() === state.provinciaActual);
-    state.condFileProvincia = matchGlobal || wb.SheetNames[0] || null;
-    state.condFileRaw = state.condFileProvincia ? loadCondRaw(wb.Sheets[state.condFileProvincia]) : [];
-
-    $('dz-condiciones').style.display = 'none';
-    $('condiciones-loaded').style.display = 'block';
-    $('condiciones-filename').textContent = fileName;
-    $('condiciones-meta').textContent = `${wb.SheetNames.length} provincia(s)`;
-
-    const sel = $('sel-provincia');
-    sel.innerHTML = '';
-    wb.SheetNames.forEach(n => {
-      const o = el('option', null, n); o.value = n;
-      if (n === state.condFileProvincia) o.selected = true;
-      sel.appendChild(o);
-    });
-    sel.onchange = () => {
-      state.condFileProvincia = sel.value || null;
-      state.condFileRaw = state.condFileProvincia ? loadCondRaw(wb.Sheets[state.condFileProvincia]) : [];
-      updateCondNotices();
-    };
-
-    updateCondNotices();
-  }
-
-  async function handleCondicionesFile(file) {
-    try {
-      const { wb, bytes } = await readWorkbook(file);
-      processCondicionesWorkbook(wb, file.name);
-      const savedAt = new Date().toISOString();
-      await dbSet('condiciones', { fileName: file.name, savedAt, bytes });
-      $('condiciones-guardado-note').style.display = 'block';
-      $('condiciones-guardado-note').textContent = `📦 Guardado para la próxima vez — usando "${file.name}", cargado el ${fmtFechaGuardado(savedAt)}.`;
-    } catch (err) {
-      alert('No se pudo leer el archivo de condiciones: ' + err.message);
-    }
-  }
-
-  async function autoLoadCondiciones() {
-    const saved = await dbGet('condiciones');
-    if (!saved) return;
-    try {
-      const wb = workbookFromBytes(saved.bytes);
-      processCondicionesWorkbook(wb, saved.fileName);
-      $('condiciones-guardado-note').style.display = 'block';
-      $('condiciones-guardado-note').textContent = `📦 Usando archivo "${saved.fileName}" cargado el ${fmtFechaGuardado(saved.savedAt)}. Subí uno nuevo para reemplazarlo.`;
-      updateAnalizarState();
-    } catch (err) { console.warn('No se pudo restaurar el archivo de condiciones guardado:', err); }
-  }
-
-  $('condiciones-remove').addEventListener('click', async () => {
-    state.condFileWb = null; state.condFileName = ''; state.condFileSheetNames = [];
-    state.condFileProvincia = null; state.condFileRaw = [];
-    $('dz-condiciones').style.display = 'block';
-    $('condiciones-loaded').style.display = 'none';
-    $('file-condiciones').value = '';
-    $('condiciones-guardado-note').style.display = 'none';
-    await dbDelete('condiciones'); // limpia lo guardado, la próxima carga será nueva
-    updateCondNotices();
-  });
-
-  function updateCondNotices() {
-    // Actualiza los avisos en el paso de cuentas según cuál sea la fuente efectiva de condiciones
-    if (!$('cond-warning')) return; // aún no se cargó el archivo de cuentas
-    const { source, condRaw } = getEffectiveCondRaw();
-    const usingArchivoCondiciones = !!(state.condFileProvincia && state.condFileRaw.length);
-    $('cond-warning').style.display = source ? 'none' : 'block';
-    const note = $('cond-source-note');
-    if (usingArchivoCondiciones) {
-      const tags = extraerTodosLosTags(condRaw);
-      const nCuotas = Object.keys(tags.cuotas).length;
-      const nDif = Object.keys(tags.diferidos).length;
-      const nNobaja = Object.keys(tags.nobajas).length;
-      const nSorteo = tags.sorteo.size;
-      const detalle = [];
-      if (nCuotas) detalle.push(`${nCuotas} cuota(s)`);
-      if (nDif) detalle.push(`${nDif} diferido(s)`);
-      if (nNobaja) detalle.push(`${nNobaja} no-baja`);
-      if (nSorteo) detalle.push(`${nSorteo} sorteo`);
-      note.style.display = 'block';
-      note.textContent = `✓ Usando condiciones del archivo separado — provincia: ${state.condFileProvincia}` +
-        (detalle.length ? ` · excepciones detectadas: ${detalle.join(', ')}` : '');
-    } else {
-      note.style.display = 'none';
-    }
-    // Ocultar el selector interno si ya hay condiciones desde el archivo separado
-    const wrap = $('wrap-sel-condiciones');
-    if (wrap) wrap.style.display = usingArchivoCondiciones ? 'none' : 'block';
-  }
-
-  function loadCondRaw(ws) {
-    const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true });
-    return aoa.slice(1)
+  function condRawFromAOA(aoa) {
+    return (aoa || []).slice(1)
       .filter(r => r && r[0] !== undefined && r[0] !== null && String(r[0]).trim() !== '')
       .map(r => ({ COD_GRU: r[0], NOMBRE_GRU: r[1], CONDICION: r[2], EXCEPCIONES: r[3] }));
   }
 
+  function cuentasRowsFromAOA(aoa) {
+    if (!aoa || aoa.length < 2) return [];
+    const headers = aoa[0].map(h => String(h || '').trim());
+    const idx = {}; headers.forEach((h, i) => { idx[h] = i; });
+    const get = (row, name) => (idx[name] !== undefined ? row[idx[name]] : null);
+    return aoa.slice(1)
+      .filter(row => get(row, 'COD_CLI') !== undefined && get(row, 'COD_CLI') !== null && String(get(row, 'COD_CLI')).trim() !== '')
+      .map(row => {
+        const debeRaw = get(row, 'DEBE'), haberRaw = get(row, 'HABER'), saldoRaw = get(row, 'SALDO');
+        return {
+          COD_CLI: get(row, 'COD_CLI'), COD_GRU: get(row, 'COD_GRU'), RAZON_SOC: get(row, 'RAZON_SOC'),
+          FECHA_EMIS: LedgerLogic.parseDate(get(row, 'FECHA_EMIS')), T_COMP: get(row, 'T_COMP'),
+          DEBE: typeof debeRaw === 'string' ? (LedgerLogic.toF(debeRaw) || 0) : (debeRaw || 0),
+          HABER: typeof haberRaw === 'string' ? (LedgerLogic.toF(haberRaw) || 0) : (haberRaw || 0),
+          SALDO: typeof saldoRaw === 'string' ? (LedgerLogic.toF(saldoRaw) || 0) : (saldoRaw || 0),
+        };
+      })
+      .filter(r => r.FECHA_EMIS !== null && r.T_COMP);
+  }
+
+  function saldosRowsFromAOA(aoa) {
+    if (!aoa || aoa.length < 2) return [];
+    const headers = aoa[0].map(h => String(h || '').trim().toUpperCase());
+    const idxCod = headers.findIndex(h => /COD.?CLI/i.test(h));
+    const idxSaldo = headers.findIndex(h => /SALDO/i.test(h));
+    const idxNombre = headers.findIndex(h => /RAZON/i.test(h));
+    if (idxCod < 0 || idxSaldo < 0) return [];
+    return aoa.slice(1)
+      .filter(row => row[idxCod] !== undefined && row[idxCod] !== null && String(row[idxCod]).trim() !== '')
+      .map(row => {
+        const saldoRaw = row[idxSaldo];
+        return {
+          COD_CLIENT: row[idxCod],
+          RAZON_SOCI: idxNombre >= 0 ? row[idxNombre] : '',
+          SALDO: typeof saldoRaw === 'string' ? (LedgerLogic.toF(saldoRaw) || 0) : (saldoRaw || 0),
+        };
+      });
+  }
+
+  function getEffectiveCondRaw() {
+    if (state.condFileProvincia && state.condFileRaw.length) {
+      return { condRaw: state.condFileRaw, source: `Google Sheets — ${state.condFileProvincia}` };
+    }
+    return { condRaw: [], source: null };
+  }
+
   // ---------- Parser de etiquetas ##CUOTA / ##DIFERIDO / ##NOBAJA / ##SORTEO ----------
-  // Se buscan en la columna EXCEPCIONES (y también en CONDICION, por si alguna
-  // quedó mezclada ahí) de cada fila del archivo de condiciones.
 
   function toFTag(s) {
     return parseFloat(String(s).trim().replace(/\./g, '').replace(',', '.'));
@@ -1400,14 +1133,12 @@
     const out = { cuotas: {}, diferidos: {}, nobajas: {}, sorteo: new Set() };
     if (!texto) return out;
     const t = String(texto);
-
     for (const m of t.matchAll(/##CUOTA\(([^)]*)\)/gi)) {
       m[1].split(';').forEach(seg => {
         const mm = seg.match(/(\d{4,7})\s*:\s*([\d.,]+)\s*(USD|PESOS)?/i);
         if (mm) out.cuotas[mm[1]] = toFTag(mm[2]);
       });
     }
-
     for (const m of t.matchAll(/##DIFERIDO\(([^)]*)\)/gi)) {
       const inner = m[1];
       const codMatch = inner.match(/(\d{4,7})\s*:/);
@@ -1422,16 +1153,13 @@
         out.diferidos[cod].push(...pares);
       }
     }
-
     for (const m of t.matchAll(/##NOBAJA\(([^)]*)\)/gi)) {
       const mm = m[1].match(/(\d{4,7})\s*:\s*saldo\s*<=\s*([\d.,]+)/i);
       if (mm) out.nobajas[mm[1]] = toFTag(mm[2]);
     }
-
     for (const m of t.matchAll(/##SORTEO\(([^)]*)\)/gi)) {
       m[1].split(',').forEach(c => { const cc = c.trim(); if (cc) out.sorteo.add(cc); });
     }
-
     return out;
   }
 
@@ -1457,7 +1185,6 @@
   }
 
   // ---------- Detección de destino a partir del nombre del grupo ----------
-  // Patrón esperado: "AA-P-EGR-XXX-..." donde XXX es el código de 3 letras del destino.
   const DESTINOS = { VCP: 'Villa Carlos Paz', BRC: 'Bariloche', CBW: 'Camboriú', CUN: 'Cancún' };
   function getDestinoInfo(nombreGrupo) {
     if (!nombreGrupo) return { label: 'Sin grupo', code: null, recognized: false };
@@ -1468,224 +1195,65 @@
     return { label: code, code, recognized: false };
   }
 
-  function tokensOf(sheetName) {
-    const upper = sheetName.toUpperCase();
-    const yearMatch = upper.match(/\d{4}/);
-    const isUsd = /USD|DOLAR/.test(upper);
-    return { year: yearMatch ? yearMatch[0] : null, isUsd };
-  }
+  // ---------- Carga de datos por provincia (Condiciones + Cuentas + "SL ..." Saldos) ----------
 
-  function guessSaldosMatch(cuentasSheetName, saldosSheetNames) {
-    const t = tokensOf(cuentasSheetName);
-    let best = '';
-    for (const s of saldosSheetNames) {
-      const ts = tokensOf(s);
-      if (t.year && ts.year === t.year && ts.isUsd === t.isUsd) { best = s; break; }
-    }
-    return best;
-  }
-
-  // ---------- Paso 1: cuentas ----------
-
-  const dzCuentas = $('dz-cuentas');
-  const fileCuentas = $('file-cuentas');
-
-  bindDropzone(dzCuentas, fileCuentas, handleCuentasFile);
-
-  function processCuentasWorkbook(wb, fileName) {
-    state.cuentasWb = wb;
-    state.cuentasFileName = fileName;
-    const condName = guessCondSheet(wb.SheetNames);
-    state.condSheetName = condName;
-    state.condRaw = condName ? loadCondRaw(wb.Sheets[condName]) : [];
-
-    state.cuentasSheets = wb.SheetNames
-      .filter(n => n !== condName)
-      .map(n => {
-        const rows = loadCuentasSheetRows(wb.Sheets[n]);
-        return { name: n, rows, checked: rows.length > 0 };
-      });
-
-    renderCuentasLoaded();
-    renderMappingRows();
-    updateAnalizarState();
-  }
-
-  async function handleCuentasFile(file) {
-    try {
-      const { wb, bytes } = await readWorkbook(file);
-      processCuentasWorkbook(wb, file.name);
-      if (state.provinciaActual) {
-        const savedAt = new Date().toISOString();
-        await dbSet(`cuentas_${state.provinciaActual}`, { fileName: file.name, savedAt, bytes });
-        $('cuentas-guardado-note').style.display = 'block';
-        $('cuentas-guardado-note').textContent = `📦 Guardado para ${state.provinciaActual} — usando "${file.name}", cargado el ${fmtFechaGuardado(savedAt)}.`;
-      }
-    } catch (err) {
-      alert('No se pudo leer el archivo de cuentas: ' + err.message);
-    }
-  }
-
-  async function autoLoadCuentas(provincia) {
-    const saved = await dbGet(`cuentas_${provincia}`);
-    $('cuentas-guardado-note').style.display = 'none';
-    if (!saved) return false;
-    try {
-      const wb = workbookFromBytes(saved.bytes);
-      processCuentasWorkbook(wb, saved.fileName);
-      $('cuentas-guardado-note').style.display = 'block';
-      $('cuentas-guardado-note').textContent = `📦 Usando archivo "${saved.fileName}" de ${provincia}, cargado el ${fmtFechaGuardado(saved.savedAt)}. Subí uno nuevo para reemplazarlo.`;
-      return true;
-    } catch (err) { console.warn('No se pudo restaurar el archivo de cuentas guardado:', err); return false; }
-  }
-
-  function limpiarCuentas() {
-    state.cuentasWb = null; state.cuentasFileName = ''; state.cuentasSheets = [];
-    state.condSheetName = null; state.condRaw = [];
-    $('dz-cuentas').style.display = 'block';
-    $('cuentas-loaded').style.display = 'none';
-    $('file-cuentas').value = '';
-    $('cuentas-guardado-note').style.display = 'none';
-    renderMappingRows();
-    updateAnalizarState();
-  }
-
-  function renderCuentasLoaded() {
-    $('dz-cuentas').style.display = 'none';
-    $('cuentas-loaded').style.display = 'block';
-    $('cuentas-filename').textContent = state.cuentasFileName;
-    const totalCli = state.cuentasSheets.reduce((a, s) => a + new Set(s.rows.map(r => String(r.COD_CLI).trim())).size, 0);
-    $('cuentas-meta').textContent = `${state.cuentasSheets.length} pestañas · ~${totalCli} clientes`;
-
-    const sel = $('sel-condiciones');
-    sel.innerHTML = '';
-    const optNone = el('option', null, 'Ninguna (sin condiciones)'); optNone.value = '';
-    sel.appendChild(optNone);
-    state.cuentasWb.SheetNames.forEach(n => {
-      const o = el('option', null, n); o.value = n;
-      if (n === state.condSheetName) o.selected = true;
-      sel.appendChild(o);
-    });
-    sel.onchange = () => {
-      state.condSheetName = sel.value || null;
-      state.condRaw = state.condSheetName ? loadCondRaw(state.cuentasWb.Sheets[state.condSheetName]) : [];
-      updateCondNotices();
-      state.cuentasSheets = state.cuentasWb.SheetNames
-        .filter(n => n !== state.condSheetName)
-        .map(n => {
-          const existing = state.cuentasSheets.find(s => s.name === n);
-          const rows = loadCuentasSheetRows(state.cuentasWb.Sheets[n]);
-          return { name: n, rows, checked: existing ? existing.checked : rows.length > 0 };
-        });
-      renderSheetsList();
-      renderMappingRows();
+  function setCargaEstado(texto, tipo) {
+    const div = $('carga-estado');
+    div.style.display = 'block';
+    const estilos = {
+      cargando: 'background:rgba(184,134,43,0.12); border:1px solid rgba(184,134,43,0.35); color:#8A6412;',
+      ok: 'background:rgba(30,111,92,0.10); border:1px solid rgba(30,111,92,0.3); color:var(--pine-dark);',
+      error: 'background:rgba(162,59,46,0.10); border:1px solid rgba(162,59,46,0.35); color:var(--stamp-red-dark);',
     };
-
-    updateCondNotices();
-    renderSheetsList();
+    div.setAttribute('style', `display:block; margin:0 22px 16px; padding:10px 14px; border-radius:3px; font-size:13px; ${estilos[tipo] || estilos.cargando}`);
+    div.textContent = texto;
   }
 
-  function renderSheetsList() {
-    const wrap = $('cuentas-sheets-list');
-    wrap.innerHTML = '';
-    state.cuentasSheets.forEach(s => {
-      const tab = el('label', 'folder-tab');
-      const cb = el('input'); cb.type = 'checkbox'; cb.checked = s.checked;
-      cb.onchange = () => { s.checked = cb.checked; updateAnalizarState(); };
-      tab.appendChild(cb);
-      const nClientes = new Set(s.rows.map(r => String(r.COD_CLI).trim())).size;
-      tab.appendChild(document.createTextNode(s.name + ' '));
-      const count = el('span', 'count', `(${nClientes})`);
-      tab.appendChild(count);
-      wrap.appendChild(tab);
-    });
-  }
+  async function cargarDatosDeProvincia(provincia) {
+    $('btn-actualizar').disabled = true;
+    $('btn-analizar').disabled = true;
+    setCargaEstado(`⟳ Cargando datos de ${provincia} desde Google Sheets...`, 'cargando');
 
-  $('cuentas-remove').addEventListener('click', async () => {
-    limpiarCuentas();
-    if (state.provinciaActual) await dbDelete(`cuentas_${state.provinciaActual}`);
-  });
-
-  // ---------- Paso 2: saldos ----------
-
-  const dzSaldos = $('dz-saldos');
-  const fileSaldos = $('file-saldos');
-  bindDropzone(dzSaldos, fileSaldos, handleSaldosFile);
-
-  function processSaldosWorkbook(wb, fileName) {
-    state.saldosWb = wb;
-    state.saldosFileName = fileName;
-    state.saldosSheetNames = wb.SheetNames;
-    $('dz-saldos').style.display = 'none';
-    $('saldos-loaded').style.display = 'block';
-    $('saldos-filename').textContent = fileName;
-    $('saldos-meta').textContent = `${wb.SheetNames.length} pestañas`;
-    renderMappingRows();
-  }
-
-  async function handleSaldosFile(file) {
     try {
-      const { wb, bytes } = await readWorkbook(file);
-      processSaldosWorkbook(wb, file.name);
-      if (state.provinciaActual) {
-        const savedAt = new Date().toISOString();
-        await dbSet(`saldos_${state.provinciaActual}`, { fileName: file.name, savedAt, bytes });
-        $('saldos-guardado-note').style.display = 'block';
-        $('saldos-guardado-note').textContent = `📦 Guardado para ${state.provinciaActual} — usando "${file.name}", cargado el ${fmtFechaGuardado(savedAt)}.`;
-      }
-    } catch (err) {
-      alert('No se pudo leer el archivo de saldos: ' + err.message);
-    }
-  }
+      // Condiciones: solo la pestaña de esta provincia
+      const condTitles = await gsFetchSheetTitles(GS_SHEET_IDS.CONDICIONES);
+      const condMatch = condTitles.find(t => t.toUpperCase() === provincia);
+      if (!condMatch) throw new Error(`No se encontró la pestaña "${provincia}" en el archivo de Condiciones.`);
+      const condValues = await gsFetchValuesBatch(GS_SHEET_IDS.CONDICIONES, [condMatch]);
+      state.condFileProvincia = provincia;
+      state.condFileRaw = condRawFromAOA(condValues[condMatch] || []);
 
-  async function autoLoadSaldos(provincia) {
-    const saved = await dbGet(`saldos_${provincia}`);
-    $('saldos-guardado-note').style.display = 'none';
-    if (!saved) return false;
-    try {
-      const wb = workbookFromBytes(saved.bytes);
-      processSaldosWorkbook(wb, saved.fileName);
-      $('saldos-guardado-note').style.display = 'block';
-      $('saldos-guardado-note').textContent = `📦 Usando archivo "${saved.fileName}" de ${provincia}, cargado el ${fmtFechaGuardado(saved.savedAt)}. Subí uno nuevo para reemplazarlo.`;
-      return true;
-    } catch (err) { console.warn('No se pudo restaurar el archivo de saldos guardado:', err); return false; }
-  }
+      // Cuentas + saldos: todas las pestañas del archivo de esta provincia
+      const spreadsheetId = GS_SHEET_IDS[provincia];
+      const allTitles = await gsFetchSheetTitles(spreadsheetId);
+      const cuentasTitles = allTitles.filter(t => !/^SL\s/i.test(t.trim()));
+      const saldosTitles = allTitles.filter(t => /^SL\s/i.test(t.trim()));
+      const allValues = await gsFetchValuesBatch(spreadsheetId, allTitles);
 
-  function limpiarSaldos() {
-    state.saldosWb = null; state.saldosFileName = ''; state.saldosSheetNames = []; state.mapping = {};
-    $('dz-saldos').style.display = 'block';
-    $('saldos-loaded').style.display = 'none';
-    $('file-saldos').value = '';
-    $('saldos-guardado-note').style.display = 'none';
-    renderMappingRows();
-  }
-
-  $('saldos-remove').addEventListener('click', async () => {
-    limpiarSaldos();
-    if (state.provinciaActual) await dbDelete(`saldos_${state.provinciaActual}`);
-  });
-
-  function renderMappingRows() {
-    const wrap = $('mapping-rows');
-    wrap.innerHTML = '';
-    if (!state.saldosWb || !state.cuentasSheets.length) return;
-    state.cuentasSheets.forEach(s => {
-      const row = el('div', 'grid-2'); row.style.marginBottom = '10px'; row.style.alignItems = 'center';
-      const label = el('div', null, `<strong style="font-size:13px;">${s.name}</strong>`);
-      const sel = el('select');
-      const optNone = el('option', null, '— No validar —'); optNone.value = '';
-      sel.appendChild(optNone);
-      state.saldosSheetNames.forEach(n => {
-        const o = el('option', null, n); o.value = n;
-        sel.appendChild(o);
+      state.cuentasSheets = cuentasTitles.map(name => {
+        const rows = cuentasRowsFromAOA(allValues[name] || []);
+        return { name, rows, checked: rows.length > 0 };
       });
-      const guess = state.mapping[s.name] !== undefined ? state.mapping[s.name] : guessSaldosMatch(s.name, state.saldosSheetNames);
-      sel.value = guess || '';
-      state.mapping[s.name] = sel.value;
-      sel.onchange = () => { state.mapping[s.name] = sel.value; };
-      row.appendChild(label); row.appendChild(sel);
-      wrap.appendChild(row);
-    });
+
+      state.saldosPorHoja = {};
+      saldosTitles.forEach(saldTitle => {
+        const cuentasName = saldTitle.replace(/^SL\s+/i, '').trim();
+        state.saldosPorHoja[cuentasName] = saldosRowsFromAOA(allValues[saldTitle] || []);
+      });
+
+      const nSaldos = Object.keys(state.saldosPorHoja).length;
+      const nClientesAprox = state.cuentasSheets.reduce((a, s) => a + s.rows.filter((r, i, arr) => arr.findIndex(x => x.COD_CLI === r.COD_CLI) === i).length, 0);
+      setCargaEstado(`✓ ${provincia} actualizado — ${cuentasTitles.length} pestaña(s) de cuentas, ${nSaldos} con saldos para validar, ${state.condFileRaw.length} grupos en condiciones.`, 'ok');
+    } catch (err) {
+      setCargaEstado(`⚠ No se pudo actualizar ${provincia}: ${err.message}`, 'error');
+      state.cuentasSheets = [];
+      state.saldosPorHoja = {};
+      state.condFileRaw = [];
+      state.condFileProvincia = null;
+    } finally {
+      $('btn-actualizar').disabled = !state.provinciaActual;
+      updateAnalizarState();
+    }
   }
 
   // ---------- Config por defecto ----------
@@ -1799,23 +1367,17 @@
           });
 
           let validation = null;
-          const saldosSheetName = state.mapping[s.name];
-          if (state.saldosWb && saldosSheetName) {
-            const refRows = XLSX.utils.sheet_to_json(state.saldosWb.Sheets[saldosSheetName], { raw: true, defval: null });
+          const refRows = state.saldosPorHoja[s.name];
+          if (refRows && refRows.length) {
             const calcDict = new Map(res.map(r => [r.cod, r]));
             let coinciden = 0; const diffs = []; const noEnc = [];
             refRows.forEach(row => {
-              const codKeys = Object.keys(row).filter(k => /COD.?CLI/i.test(k));
-              const saldoKeys = Object.keys(row).filter(k => /SALDO/i.test(k));
-              const nombreKeys = Object.keys(row).filter(k => /RAZON/i.test(k));
-              const codVal = codKeys.length ? row[codKeys[0]] : null;
+              const codVal = row.COD_CLIENT;
               if (codVal === null || codVal === undefined || String(codVal).trim() === '') return;
               const cod = String(codVal).trim();
-              let refV = saldoKeys.length ? row[saldoKeys[0]] : null;
-              if (typeof refV === 'string') refV = LedgerLogic.toF(refV);
+              const refV = row.SALDO;
               if (refV === null || refV === undefined) return;
-              const nombreRef = nombreKeys.length ? row[nombreKeys[0]] : '';
-              if (!calcDict.has(cod)) { noEnc.push({ cod, nombre: nombreRef, refV }); return; }
+              if (!calcDict.has(cod)) { noEnc.push({ cod, nombre: row.RAZON_SOCI, refV }); return; }
               const r = calcDict.get(cod);
               const calcV = (r.totalPorAbonar || 0) - (r.totalPagadoActivo || 0);
               const diff = Math.round((calcV - refV) * 100) / 100;
@@ -1825,7 +1387,7 @@
               else if (r.estado !== 'DADO DE BAJA') diffs.push({ cod, nombre: r.nombre, grupo: r.codGru, refV, calcV: Math.round(calcV*100)/100, diff, tieneFac: r.tieneFac });
             });
             diffs.sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
-            validation = { coinciden, total: refRows.length, diffs, noEnc, sheetRef: saldosSheetName };
+            validation = { coinciden, total: refRows.length, diffs, noEnc, sheetRef: `SL ${s.name}` };
           }
 
           results[s.name] = { results: res, counts, validation, moneda };
@@ -2300,46 +1862,29 @@
     XLSX.writeFile(wb, fname);
   }
 
-  // ---------- Selector global de Provincia (gobierna los 3 archivos guardados) ----------
+  // ---------- Selector global de Provincia + botón Actualizar ----------
 
   $('sel-provincia-global').addEventListener('change', async (e) => {
     const prov = e.target.value;
     state.provinciaActual = prov;
+    $('btn-actualizar').disabled = !prov;
 
     if (!prov) {
-      limpiarCuentas();
-      limpiarSaldos();
+      state.cuentasSheets = [];
+      state.saldosPorHoja = {};
+      state.condFileRaw = [];
+      state.condFileProvincia = null;
+      $('carga-estado').style.display = 'none';
+      updateAnalizarState();
       return;
     }
 
-    // Si el archivo de condiciones ya está cargado, tratar de pararse en la pestaña correspondiente
-    if (state.condFileWb) {
-      const match = state.condFileWb.SheetNames.find(n => n.toUpperCase() === prov);
-      if (match) {
-        state.condFileProvincia = match;
-        state.condFileRaw = loadCondRaw(state.condFileWb.Sheets[match]);
-        const sel = $('sel-provincia');
-        if (sel) sel.value = match;
-        updateCondNotices();
-      }
-    }
-
-    // Traer automáticamente cuentas y saldos guardados para esta provincia (si existen)
-    const tengoC = await autoLoadCuentas(prov);
-    if (!tengoC) limpiarCuentas();
-    const tengoS = await autoLoadSaldos(prov);
-    if (!tengoS) limpiarSaldos();
+    await cargarDatosDeProvincia(prov);
   });
 
-  $('btn-borrar-guardado').addEventListener('click', async () => {
-    const ok = confirm('Esto borra todos los archivos guardados (condiciones, cuentas y saldos de las 4 provincias). No afecta a los archivos en tu computadora. ¿Confirmás?');
-    if (!ok) return;
-    await dbClearAll();
-    location.reload();
+  $('btn-actualizar').addEventListener('click', async () => {
+    if (state.provinciaActual) await cargarDatosDeProvincia(state.provinciaActual);
   });
-
-  // Al iniciar la página, intentar restaurar el archivo de condiciones guardado
-  autoLoadCondiciones();
 
 })();
 </script>
