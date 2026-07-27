@@ -362,7 +362,7 @@
 <body>
 
 <div class="topbar">
-  <span class="version-badge">V30</span>
+  <span class="version-badge">V31</span>
   <div class="topbar-inner">
     <div class="brand-mark">
       <div class="glyph">CC</div>
@@ -1551,7 +1551,7 @@
           ...v.noEnc.map(x => ({ cod: x.cod, nombre: x.nombre, grupo: '—', falta: n }))
         ];
         if (noValidados.length) {
-          panel.appendChild(el('div', 'section-title', 'Clientes no validados'));
+          panel.appendChild(el('div', 'section-title', `Clientes no validados (${noValidados.length})`));
           const scrollNV = el('div', 'table-scroll');
           const tableNV = el('table', 'ledger');
           tableNV.innerHTML = `<thead><tr>
@@ -1572,7 +1572,7 @@
           panel.appendChild(el('div', 'empty-note', 'Todos los saldos coinciden — no hay diferencias para mostrar.'));
         } else {
           if (v.diffs.length) {
-            panel.appendChild(el('div', 'section-title', 'Clientes a controlar su saldo'));
+            panel.appendChild(el('div', 'section-title', `Clientes a controlar su saldo (${v.diffs.length})`));
             const scroll = el('div', 'table-scroll');
             const table = el('table', 'ledger');
             table.innerHTML = `<thead><tr>
@@ -1601,7 +1601,7 @@
 
       // Clientes dados de baja
       const bajas = data.results.filter(r => r.estado === 'DADO DE BAJA');
-      panel.appendChild(el('div', 'section-title', 'Clientes dados de baja'));
+      panel.appendChild(el('div', 'section-title', `Clientes dados de baja (${bajas.length})`));
       if (bajas.length === 0) {
         panel.appendChild(el('div', 'empty-note', 'No hay clientes dados de baja en esta pestaña.'));
       } else {
