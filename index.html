@@ -362,7 +362,7 @@
 <body>
 
 <div class="topbar">
-  <span class="version-badge">V28</span>
+  <span class="version-badge">V29</span>
   <div class="topbar-inner">
     <div class="brand-mark">
       <div class="glyph">CC</div>
@@ -1235,10 +1235,28 @@
         return { name, rows, checked: rows.length > 0 };
       });
 
+      // Emparejar cada pestaña "SL ..." con su pestaña de cuentas por año + tipo de moneda
+      // (no por nombre exacto), ya que a veces una dice "USD" y la otra "DOLARES".
+      function añoYMonedaDe(titulo) {
+        const t = titulo.toUpperCase();
+        const año = (t.match(/\d{4}/) || [])[0] || null;
+        const esUsd = /USD|DOLAR/.test(t);
+        return { año, esUsd };
+      }
       state.saldosPorHoja = {};
       saldosTitles.forEach(saldTitle => {
-        const cuentasName = saldTitle.replace(/^SL\s+/i, '').trim();
-        state.saldosPorHoja[cuentasName] = saldosRowsFromAOA(allValues[saldTitle] || []);
+        const sinPrefijo = saldTitle.replace(/^SL\s+/i, '').trim();
+        const infoSaldo = añoYMonedaDe(sinPrefijo);
+        // 1) intento de coincidencia exacta de nombre (caso más común)
+        let match = cuentasTitles.find(n => n === sinPrefijo);
+        // 2) si no coincide exacto, empareja por año + si es USD/DOLARES o no
+        if (!match) {
+          match = cuentasTitles.find(n => {
+            const infoCuenta = añoYMonedaDe(n);
+            return infoCuenta.año === infoSaldo.año && infoCuenta.esUsd === infoSaldo.esUsd;
+          });
+        }
+        if (match) state.saldosPorHoja[match] = saldosRowsFromAOA(allValues[saldTitle] || []);
       });
 
       const nSaldos = Object.keys(state.saldosPorHoja).length;
@@ -1421,6 +1439,8 @@
       const v = state.results[n].validation;
       if (v) { anyValidation = true; totalCoin += v.coinciden; totalRef += v.total; }
     });
+    const totalClientesAnalizados = sheetNames.reduce((a, n) => a + state.results[n].results.length, 0);
+    const sinValidar = totalClientesAnalizados - totalRef;
 
     // Stamp banner
     const banner = el('div', 'stamp-banner');
@@ -1435,7 +1455,8 @@
       const copy = el('div', 'stamp-copy');
       copy.innerHTML = `<h3>${ok ? 'Todo concilia' : 'Hay diferencias para revisar'}</h3>
         <p>Se compararon los saldos calculados contra el archivo de saldos de referencia en las pestañas donde indicaste una relación.</p>
-        <div class="big-frac">${totalCoin} / ${totalRef} clientes coinciden</div>`;
+        <div class="big-frac">${totalCoin} / ${totalRef} clientes coinciden</div>
+        ${sinValidar > 0 ? `<p style="margin-top:8px; color:var(--stamp-red-dark);">⚠ ${sinValidar} cliente(s) de ${totalClientesAnalizados} analizados no tienen pestaña "SL" para validar — no están representados en este número.</p>` : ''}`;
       banner.appendChild(copy);
     } else {
       const stamp = el('div', 'stamp ok');
