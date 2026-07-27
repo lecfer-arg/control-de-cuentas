@@ -366,7 +366,7 @@
 <body>
 
 <div class="topbar">
-  <span class="version-badge">V33</span>
+  <span class="version-badge">V34</span>
   <div class="topbar-inner">
     <div class="brand-mark">
       <div class="glyph">CC</div>
@@ -1218,6 +1218,19 @@
     return { label: code, code, recognized: false };
   }
 
+  function getColegioFromNombre(nombreGrupo) {
+    // Extrae el nombre del colegio a partir del patrón "AA-P-EGR-XXX-fecha-COLEGIO"
+    if (!nombreGrupo) return '—';
+    const nombre = String(nombreGrupo);
+    const m = nombre.match(/EGR-[A-Z]{2,5}/i);
+    if (!m) return nombre.trim() || '—';
+    let resto = nombre.slice(m.index + m[0].length);
+    resto = resto.replace(/^\s*-?\s*\d{1,2}\/\d{1,2}/, ''); // saca fecha tipo "-9/7" si está pegada
+    resto = resto.replace(/^[\s-]+/, ''); // saca guiones/espacios sueltos que quedan al principio
+    resto = resto.trim();
+    return resto || nombre.trim() || '—';
+  }
+
   // ---------- Carga de datos por provincia (Condiciones + Cuentas + "SL ..." Saldos) ----------
 
   function setCargaEstado(texto, tipo) {
@@ -1387,12 +1400,13 @@
           // marcar beneficio por grupo
           res.forEach(r => { if (gruposLib.has(r.codGru)) r.esLib = true; });
 
-          // marcar destino por grupo
+          // marcar destino y colegio por grupo
           res.forEach(r => {
             const nombreGru = codGruToNombre[r.codGru];
             const destInfo = getDestinoInfo(nombreGru);
             r.destino = destInfo.label;
             r.destinoReconocido = destInfo.recognized;
+            r.colegio = getColegioFromNombre(nombreGru);
             if (!destInfo.recognized && !gruposNoReconocidosMap.has(r.codGru)) {
               gruposNoReconocidosMap.set(r.codGru, { nombre: nombreGru || '(sin nombre)', code: destInfo.code });
             }
@@ -1685,18 +1699,21 @@
         const scrollAct = el('div', 'table-scroll');
         const tableAct = el('table', 'ledger');
         tableAct.innerHTML = `<thead><tr>
-          <th>Grupo</th><th>Código</th><th>Nombre</th><th class="num">Viajes</th>
+          <th>Grupo</th><th>Colegio</th><th>Destino</th><th>Código</th><th>Nombre</th><th class="num">Viajes</th>
           <th>Último Pago Registrado</th><th>CAU (viaje actual)</th><th>FAC (viaje actual)</th><th>Observaciones</th>
         </tr></thead>`;
         const tbodyAct = el('tbody');
         activosCorrectos.forEach(r => {
           const tr = el('tr');
-          tr.innerHTML = `<td>${r.codGru}</td><td>${r.cod}</td><td>${r.nombre}</td>
+          let obsSimple = '';
+          if (r.estado === 'GANADOR SORTEO') obsSimple = 'Ganador de Sorteo';
+          else if (r.estado === 'SIN PAGOS') obsSimple = 'Cliente sin pagos';
+          tr.innerHTML = `<td>${r.codGru}</td><td>${r.colegio || '—'}</td><td>${r.destino || '—'}</td><td>${r.cod}</td><td>${r.nombre}</td>
             <td class="num">${r.viajes}</td>
             <td>${r.ultimoPago ? fmtDate(r.ultimoPago) : '—'}</td>
             <td style="text-align:center;">${(r.cauMonto || 0) > 0 ? '✓' : '✗'}</td>
             <td style="text-align:center;">${r.tieneFacActivo ? '✓' : '✗'}</td>
-            <td>${r.obs && r.obs !== '—' ? r.obs : ''}</td>`;
+            <td>${obsSimple}</td>`;
           tbodyAct.appendChild(tr);
         });
         tableAct.appendChild(tbodyAct);
