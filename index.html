@@ -362,7 +362,7 @@
 <body>
 
 <div class="topbar">
-  <span class="version-badge">V31</span>
+  <span class="version-badge">V32</span>
   <div class="topbar-inner">
     <div class="brand-mark">
       <div class="glyph">CC</div>
@@ -1446,7 +1446,17 @@
       if (v) { anyValidation = true; totalCoin += v.coinciden; totalRef += v.total; }
     });
     const totalClientesAnalizados = sheetNames.reduce((a, n) => a + state.results[n].results.length, 0);
-    const sinValidar = totalClientesAnalizados - totalRef;
+
+    // Cálculo real de "no validados": el mismo, cliente por cliente, que usa cada
+    // pestaña en su propia sección "Clientes no validados" (no una resta de totales).
+    const desgloseSinValidar = [];
+    sheetNames.forEach(n => {
+      const data = state.results[n];
+      const v = data.validation;
+      const nSinValidar = v ? (v.faltaEnSaldos.length + v.noEnc.length) : data.results.length;
+      if (nSinValidar > 0) desgloseSinValidar.push({ pestaña: n, n: nSinValidar });
+    });
+    const sinValidar = desgloseSinValidar.reduce((a, x) => a + x.n, 0);
 
     // Stamp banner
     const banner = el('div', 'stamp-banner');
@@ -1459,10 +1469,11 @@
         : `<div class="s1">CUENTAS</div><div class="s2">${totalRef - totalCoin}</div><div class="s3">A REVISAR</div>`;
       banner.appendChild(stamp);
       const copy = el('div', 'stamp-copy');
+      const detalleSinValidar = desgloseSinValidar.map(x => `${x.pestaña} (${x.n})`).join(', ');
       copy.innerHTML = `<h3>${ok ? 'Todo concilia' : 'Hay diferencias para revisar'}</h3>
         <p>Se compararon los saldos calculados contra el archivo de saldos de referencia en las pestañas donde indicaste una relación.</p>
         <div class="big-frac">${totalCoin} / ${totalRef} clientes coinciden</div>
-        ${sinValidar > 0 ? `<p style="margin-top:8px; color:var(--stamp-red-dark);">⚠ ${sinValidar} cliente(s) de ${totalClientesAnalizados} analizados no tienen pestaña "SL" para validar — no están representados en este número.</p>` : ''}`;
+        ${sinValidar > 0 ? `<p style="margin-top:8px; color:var(--stamp-red-dark);">⚠ ${sinValidar} cliente(s) de ${totalClientesAnalizados} analizados no se pudieron validar (no aparecen del otro lado, cuentas o "SL"). Por pestaña: ${detalleSinValidar}.</p>` : ''}`;
       banner.appendChild(copy);
     } else {
       const stamp = el('div', 'stamp ok');
