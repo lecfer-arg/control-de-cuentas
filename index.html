@@ -28,6 +28,9 @@
     --radius: 3px;
     --resumen-bg: #EAF1EA;
     --resumen-border: #B9CFB9;
+    --activos-bg: #E8F0F7;
+    --activos-border: #B7CDE0;
+    --activos-title: #2E5C8A;
   }
 
   * { box-sizing: border-box; }
@@ -324,6 +327,7 @@
   .section-title:first-of-type { margin-top: 0; }
   .section-title.resumen-title { color: var(--pine-dark); border-bottom-color: var(--pine); }
   .resumen-global table.ledger th { background: #DCE9DC; }
+  .activos-detalle table.ledger th { background: #D3E3F0; }
 
   .val-summary {
     display: flex; align-items: baseline; gap: 10px; margin: 4px 0 14px;
@@ -362,7 +366,7 @@
 <body>
 
 <div class="topbar">
-  <span class="version-badge">V32</span>
+  <span class="version-badge">V33</span>
   <div class="topbar-inner">
     <div class="brand-mark">
       <div class="glyph">CC</div>
@@ -735,6 +739,24 @@
     return sumWhere(bloque, 'DEBE', ['CAU']);
   }
 
+  function getFacActivo(grp, ultimaDinDate) {
+    // Igual que getCauMonto, pero devuelve si hay algún FAC dentro del bloque
+    // del viaje activo (desde la última DIN vigente hacia la actualidad).
+    const dinsNuevasIdx = [];
+    grp.forEach((r, i) => { if (r.T_COMP === 'DIN' && r.FECHA_EMIS >= ultimaDinDate) dinsNuevasIdx.push(i); });
+    if (dinsNuevasIdx.length === 0) return false;
+    const ultimaDinIdx = dinsNuevasIdx[dinsNuevasIdx.length - 1];
+    if (tieneNovPost(grp, ultimaDinIdx)) return false;
+    let primerNuevoIdx = -1;
+    for (let i = 0; i < grp.length; i++) {
+      if ((grp[i].T_COMP === 'CAU' || grp[i].T_COMP === 'DIN') && grp[i].FECHA_EMIS >= ultimaDinDate) { primerNuevoIdx = i; break; }
+    }
+    if (primerNuevoIdx === -1) return false;
+    const pfn = grp[primerNuevoIdx].FECHA_EMIS;
+    const bloque = grp.filter(r => r.FECHA_EMIS >= pfn);
+    return bloque.some(r => r.T_COMP === 'FAC');
+  }
+
   function getDineroFavor(grp, ultimaDinDate) {
     const previos = grp.filter(r => r.FECHA_EMIS < ultimaDinDate);
     if (previos.length === 0) return null;
@@ -779,7 +801,7 @@
         mesesSinPago: [], mesesParcial: [], cauMonto: 0, rtcMonto: 0,
         estado: 'GANADOR SORTEO', bajaDesde: '—',
         obs: 'Ganador de sorteo — sin análisis financiero', moneda, esLib: false,
-        tieneFac: rowsFull.some(r => r.T_COMP === 'FAC')
+        tieneFac: rowsFull.some(r => r.T_COMP === 'FAC'), tieneFacActivo: false
       };
     }
 
@@ -824,7 +846,7 @@
         cuotaMin: opts.cuota != null ? opts.cuota : cuotaDef, cantPagos: 0, saldo: saldoTotal,
         totalPagado: totalPagadoGlobal, totalPagadoActivo: 0,
         mesesSinPago: [], mesesParcial: [], cauMonto: opts.cau || 0, rtcMonto: 0,
-        estado, bajaDesde: '—', obs, moneda, esLib, tieneFac
+        estado, bajaDesde: '—', obs, moneda, esLib, tieneFac, tieneFacActivo: opts.facActivo || false
       };
     }
 
@@ -838,6 +860,7 @@
 
     const { tpa, pagado: totalPagadoActivo, din: dinMonto } = calcTpaPagado(grp, ultimaDinFecha, config);
     const cauMonto = getCauMonto(grp, ultimaDinFecha);
+    const tieneFacActivo = getFacActivo(grp, ultimaDinFecha);
     const dineroFavor = getDineroFavor(grp, ultimaDinFecha);
     const chequear = checkComprobantes(grp, ultimaDinFecha);
     const recs = getRecsEvaluacion(grp, ultimaDinFecha);
@@ -863,14 +886,14 @@
         cuotaMin: cuotaDef, cantPagos: 0, saldo: saldoTotal,
         totalPagado: totalPagadoGlobal, totalPagadoActivo: Math.abs(Math.min(saldoTotal, 0)),
         mesesSinPago: [], mesesParcial: [], cauMonto: 0, rtcMonto: 0,
-        estado, bajaDesde: '—', obs: obsParts.join(' | ') || '—', moneda, esLib, tieneFac
+        estado, bajaDesde: '—', obs: obsParts.join(' | ') || '—', moneda, esLib, tieneFac, tieneFacActivo: false
       };
     }
 
     if (recs.length === 0) {
       obsParts.push('MOVER A PAGOS ON LINE');
       if (chequear) obsParts.push('CHEQUEAR COMPROBANTES');
-      return base('SIN PAGOS', obsParts.join(' | '), { fechaDin: ultimaDinFecha, tpa, dineroFavor, cuota: cuotaDef, cau: cauMonto, montoDin: dinMonto });
+      return base('SIN PAGOS', obsParts.join(' | '), { fechaDin: ultimaDinFecha, tpa, dineroFavor, cuota: cuotaDef, cau: cauMonto, montoDin: dinMonto, facActivo: tieneFacActivo });
     }
 
     const primerFecha = recs[0].FECHA_EMIS;
@@ -957,7 +980,7 @@
       cuotaMin: cuotaDef, cantPagos, saldo: saldoTotal,
       totalPagado: totalPagadoGlobal, totalPagadoActivo,
       mesesSinPago, mesesParcial, cauMonto, rtcMonto,
-      estado, bajaDesde: bajaDesde || '—', obs: obsParts.join(' | ') || '—', moneda, esLib, tieneFac
+      estado, bajaDesde: bajaDesde || '—', obs: obsParts.join(' | ') || '—', moneda, esLib, tieneFac, tieneFacActivo
     };
   }
 
@@ -1635,6 +1658,52 @@
         scrollBaja.appendChild(tableBaja);
         panel.appendChild(scrollBaja);
       }
+
+      // Detalle general de clientes activos (sin diferencias, sin baja, sin pendiente de validar)
+      const activosWrap = el('div', 'activos-detalle');
+      activosWrap.style.cssText = `margin-top:22px; background:var(--activos-bg); border:1px solid var(--activos-border); border-radius:3px; padding:18px 20px;`;
+      const tituloActivos = el('div');
+      tituloActivos.style.cssText = 'font-family:"IBM Plex Serif",serif; font-weight:700; font-size:14.5px; color:var(--activos-title); text-transform:uppercase; letter-spacing:0.03em; border-bottom:2px solid var(--activos-title); padding-bottom:6px; margin-bottom:12px;';
+
+      let activosCorrectos = [];
+      if (data.validation) {
+        const v2 = data.validation;
+        const codigosNoValidados = new Set([...v2.faltaEnSaldos.map(x => x.cod), ...v2.noEnc.map(x => x.cod)]);
+        const codigosConDiferencia = new Set(v2.diffs.map(x => x.cod));
+        activosCorrectos = data.results.filter(r =>
+          r.estado !== 'DADO DE BAJA' && !codigosNoValidados.has(r.cod) && !codigosConDiferencia.has(r.cod)
+        );
+      }
+      tituloActivos.textContent = `Detalle general de clientes activos (${activosCorrectos.length})`;
+      activosWrap.appendChild(tituloActivos);
+
+      if (!data.validation) {
+        activosWrap.appendChild(el('div', 'empty-note', 'Sin archivo de saldos asociado a esta pestaña — no se puede confirmar qué clientes están correctos.'));
+      } else if (activosCorrectos.length === 0) {
+        activosWrap.appendChild(el('div', 'empty-note', 'No hay clientes activos sin observaciones en esta pestaña.'));
+      } else {
+        const scrollAct = el('div', 'table-scroll');
+        const tableAct = el('table', 'ledger');
+        tableAct.innerHTML = `<thead><tr>
+          <th>Grupo</th><th>Código</th><th>Nombre</th><th class="num">Viajes</th>
+          <th>Último Pago Registrado</th><th>CAU (viaje actual)</th><th>FAC (viaje actual)</th><th>Observaciones</th>
+        </tr></thead>`;
+        const tbodyAct = el('tbody');
+        activosCorrectos.forEach(r => {
+          const tr = el('tr');
+          tr.innerHTML = `<td>${r.codGru}</td><td>${r.cod}</td><td>${r.nombre}</td>
+            <td class="num">${r.viajes}</td>
+            <td>${r.ultimoPago ? fmtDate(r.ultimoPago) : '—'}</td>
+            <td style="text-align:center;">${(r.cauMonto || 0) > 0 ? '✓' : '✗'}</td>
+            <td style="text-align:center;">${r.tieneFacActivo ? '✓' : '✗'}</td>
+            <td>${r.obs && r.obs !== '—' ? r.obs : ''}</td>`;
+          tbodyAct.appendChild(tr);
+        });
+        tableAct.appendChild(tbodyAct);
+        scrollAct.appendChild(tableAct);
+        activosWrap.appendChild(scrollAct);
+      }
+      panel.appendChild(activosWrap);
 
       container.appendChild(panel);
     });
