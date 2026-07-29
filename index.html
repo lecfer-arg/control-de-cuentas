@@ -366,7 +366,7 @@
 <body>
 
 <div class="topbar">
-  <span class="version-badge">V35</span>
+  <span class="version-badge">V36</span>
   <div class="topbar-inner">
     <div class="brand-mark">
       <div class="glyph">CC</div>
@@ -1487,29 +1487,47 @@
     // Cálculo real de "no validados": el mismo, cliente por cliente, que usa cada
     // pestaña en su propia sección "Clientes no validados" (no una resta de totales).
     const desgloseSinValidar = [];
+    let totalBajas = 0, totalControlar = 0;
     sheetNames.forEach(n => {
       const data = state.results[n];
       const v = data.validation;
       const nSinValidar = v ? (v.faltaEnSaldos.length + v.noEnc.length) : data.results.length;
       if (nSinValidar > 0) desgloseSinValidar.push({ pestaña: n, n: nSinValidar });
+      totalBajas += data.results.filter(r => r.estado === 'DADO DE BAJA').length;
+      if (v) totalControlar += v.diffs.length;
     });
     const sinValidar = desgloseSinValidar.reduce((a, x) => a + x.n, 0);
+
+    // Grupos empresarios activos (global, sumando todas las pestañas): un grupo cuenta
+    // como "activo" si tiene al menos un cliente que no esté Dado de Baja (Al Día,
+    // Deuda Saldada, Sin Pagos, Ganador Sorteo o Con Beneficios cuentan como activos).
+    const todosLosClientes = sheetNames.flatMap(n => state.results[n].results);
+    const gruposTotalSet = new Set(todosLosClientes.map(r => r.codGru));
+    const gruposActivosSet = new Set();
+    todosLosClientes.forEach(r => {
+      const esActivo = r.esLib || r.estado !== 'DADO DE BAJA';
+      if (esActivo) gruposActivosSet.add(r.codGru);
+    });
+    const gruposActivosHtml = `<div class="field-hint" style="margin-top:6px; font-size:13px; color:var(--ink);">
+      <span class="frac" style="font-family:'IBM Plex Mono',monospace; font-weight:600;">${gruposActivosSet.size} / ${gruposTotalSet.size}</span> grupos empresarios activos</div>`;
+
+    const todoOk = totalBajas === 0 && totalControlar === 0 && sinValidar === 0;
+    const provinciaMsg = state.provinciaActual ? state.provinciaActual : '';
 
     // Stamp banner
     const banner = el('div', 'stamp-banner');
     if (anyValidation) {
-      const pct = totalRef > 0 ? totalCoin / totalRef : 1;
-      const ok = pct >= 0.999;
-      const stamp = el('div', 'stamp ' + (ok ? 'ok' : 'warn'));
-      stamp.innerHTML = ok
+      const stamp = el('div', 'stamp ' + (todoOk ? 'ok' : 'warn'));
+      stamp.innerHTML = todoOk
         ? `<div class="s1">CUENTAS</div><div class="s2">✓ OK</div><div class="s3">CONCILIADO</div>`
         : `<div class="s1">CUENTAS</div><div class="s2">${totalRef - totalCoin}</div><div class="s3">A REVISAR</div>`;
       banner.appendChild(stamp);
       const copy = el('div', 'stamp-copy');
       const detalleSinValidar = desgloseSinValidar.map(x => `${x.pestaña} (${x.n})`).join(', ');
-      copy.innerHTML = `<h3>${ok ? 'Todo concilia' : 'Hay diferencias para revisar'}</h3>
+      copy.innerHTML = `<h3>${todoOk ? `Todas las cuentas de ${provinciaMsg} coinciden` : 'Hay diferencias para revisar'}</h3>
         <p>Se compararon los saldos calculados contra el archivo de saldos de referencia en las pestañas donde indicaste una relación.</p>
         <div class="big-frac">${totalCoin} / ${totalRef} clientes coinciden</div>
+        ${gruposActivosHtml}
         ${sinValidar > 0 ? `<p style="margin-top:8px; color:var(--stamp-red-dark);">⚠ ${sinValidar} cliente(s) de ${totalClientesAnalizados} analizados no se pudieron validar (no aparecen del otro lado, cuentas o "SL"). Por pestaña: ${detalleSinValidar}.</p>` : ''}`;
       banner.appendChild(copy);
     } else {
@@ -1518,7 +1536,8 @@
       banner.appendChild(stamp);
       const copy = el('div', 'stamp-copy');
       copy.innerHTML = `<h3>Análisis completo</h3>
-        <p>No se cargó archivo de saldos de referencia, así que no hay validación cruzada — solo el detalle por cliente.</p>`;
+        <p>No se cargó archivo de saldos de referencia, así que no hay validación cruzada — solo el detalle por cliente.</p>
+        ${gruposActivosHtml}`;
       banner.appendChild(copy);
     }
     container.appendChild(banner);
@@ -1590,7 +1609,7 @@
       if (data.validation) {
         const v = data.validation;
         const summary = el('div', 'val-summary');
-        summary.innerHTML = `Validado contra <strong>${v.sheetRef}</strong> — <span class="frac">${v.coinciden}/${v.total}</span> coinciden`;
+        summary.innerHTML = `Validado contra <strong>Saldos (${v.sheetRef})</strong> — <span class="frac">${v.coinciden}/${v.total}</span> coinciden`;
         panel.appendChild(summary);
 
         // Clientes no validados (existen en un archivo pero no en el otro)
@@ -1676,8 +1695,11 @@
       // Detalle general de clientes activos (sin diferencias, sin baja, sin pendiente de validar)
       const activosWrap = el('div', 'activos-detalle');
       activosWrap.style.cssText = `margin-top:22px; background:var(--activos-bg); border:1px solid var(--activos-border); border-radius:3px; padding:18px 20px;`;
+
+      const tituloBarra = el('div');
+      tituloBarra.style.cssText = 'display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; border-bottom:2px solid var(--activos-title); padding-bottom:6px; margin-bottom:12px;';
       const tituloActivos = el('div');
-      tituloActivos.style.cssText = 'font-family:"IBM Plex Serif",serif; font-weight:700; font-size:14.5px; color:var(--activos-title); text-transform:uppercase; letter-spacing:0.03em; border-bottom:2px solid var(--activos-title); padding-bottom:6px; margin-bottom:12px;';
+      tituloActivos.style.cssText = 'font-family:"IBM Plex Serif",serif; font-weight:700; font-size:14.5px; color:var(--activos-title); text-transform:uppercase; letter-spacing:0.03em;';
 
       let activosCorrectos = [];
       if (data.validation) {
@@ -1689,21 +1711,56 @@
         );
       }
       tituloActivos.textContent = `Detalle general de clientes activos (${activosCorrectos.length})`;
-      activosWrap.appendChild(tituloActivos);
+      tituloBarra.appendChild(tituloActivos);
 
-      if (!data.validation) {
-        activosWrap.appendChild(el('div', 'empty-note', 'Sin archivo de saldos asociado a esta pestaña — no se puede confirmar qué clientes están correctos.'));
-      } else if (activosCorrectos.length === 0) {
-        activosWrap.appendChild(el('div', 'empty-note', 'No hay clientes activos sin observaciones en esta pestaña.'));
-      } else {
+      // Buscador (lupa) — filtra por Grupo o Cliente, coincidencia exacta, solo en esta pestaña
+      const buscadorWrap = el('div');
+      buscadorWrap.style.cssText = 'display:flex; align-items:center; gap:6px; position:relative;';
+      const btnLupa = el('button', null, '🔍');
+      btnLupa.type = 'button';
+      btnLupa.style.cssText = 'background:none; border:none; cursor:pointer; font-size:16px; padding:4px;';
+      const cajaBusqueda = el('div');
+      cajaBusqueda.style.cssText = 'display:none; align-items:center; gap:6px;';
+      const selTipoBusqueda = el('select');
+      selTipoBusqueda.style.cssText = 'width:auto; padding:6px 8px; font-size:12.5px;';
+      selTipoBusqueda.innerHTML = `<option value="grupo">Grupo</option><option value="cliente">Cliente</option>`;
+      const inputBusqueda = el('input');
+      inputBusqueda.type = 'text'; inputBusqueda.placeholder = 'Número...';
+      inputBusqueda.style.cssText = 'width:120px; padding:6px 8px; font-size:12.5px; border:1px solid #C9BC97; border-radius:3px;';
+      const btnLimpiar = el('button', null, '✕');
+      btnLimpiar.type = 'button';
+      btnLimpiar.style.cssText = 'background:none; border:none; cursor:pointer; color:var(--stamp-red); font-size:13px; padding:4px;';
+      cajaBusqueda.appendChild(selTipoBusqueda);
+      cajaBusqueda.appendChild(inputBusqueda);
+      cajaBusqueda.appendChild(btnLimpiar);
+      buscadorWrap.appendChild(btnLupa);
+      buscadorWrap.appendChild(cajaBusqueda);
+      tituloBarra.appendChild(buscadorWrap);
+      activosWrap.appendChild(tituloBarra);
+
+      const tablaContenedor = el('div');
+      activosWrap.appendChild(tablaContenedor);
+
+      function renderTablaActivos(lista, mostrarConteoGrupo) {
+        tablaContenedor.innerHTML = '';
+        if (!data.validation) {
+          tablaContenedor.appendChild(el('div', 'empty-note', 'Sin archivo de saldos asociado a esta pestaña — no se puede confirmar qué clientes están correctos.'));
+          return;
+        }
+        if (lista.length === 0) {
+          tablaContenedor.appendChild(el('div', 'empty-note', 'No hay clientes que coincidan.'));
+          return;
+        }
+        const gruposEnLista = new Set(lista.map(r => r.codGru)).size;
+        const labelGrupo = mostrarConteoGrupo ? `Grupo (${gruposEnLista})` : 'Grupo';
         const scrollAct = el('div', 'table-scroll');
         const tableAct = el('table', 'ledger');
         tableAct.innerHTML = `<thead><tr>
-          <th>Grupo</th><th>Colegio</th><th>Destino</th><th>Código</th><th>Nombre</th><th class="num">Viajes</th>
+          <th>${labelGrupo}</th><th>Colegio</th><th>Destino</th><th>Código</th><th>Nombre</th><th class="num">Viajes</th>
           <th>Último Pago Registrado</th><th>CAU (viaje actual)</th><th>FAC (viaje actual)</th><th>Observaciones</th>
         </tr></thead>`;
         const tbodyAct = el('tbody');
-        activosCorrectos.forEach(r => {
+        lista.forEach(r => {
           const tr = el('tr');
           let obsSimple = '';
           if (r.estado === 'GANADOR SORTEO') obsSimple = 'Ganador de Sorteo';
@@ -1718,8 +1775,29 @@
         });
         tableAct.appendChild(tbodyAct);
         scrollAct.appendChild(tableAct);
-        activosWrap.appendChild(scrollAct);
+        tablaContenedor.appendChild(scrollAct);
       }
+
+      function aplicarBusqueda() {
+        const val = inputBusqueda.value.trim();
+        if (!val) { renderTablaActivos(activosCorrectos, true); return; }
+        const tipo = selTipoBusqueda.value;
+        const filtrada = activosCorrectos.filter(r => tipo === 'grupo' ? String(r.codGru) === val : String(r.cod) === val);
+        renderTablaActivos(filtrada, false);
+      }
+
+      btnLupa.addEventListener('click', () => {
+        cajaBusqueda.style.display = cajaBusqueda.style.display === 'none' ? 'flex' : 'none';
+        if (cajaBusqueda.style.display === 'flex') inputBusqueda.focus();
+      });
+      inputBusqueda.addEventListener('input', aplicarBusqueda);
+      selTipoBusqueda.addEventListener('change', aplicarBusqueda);
+      btnLimpiar.addEventListener('click', () => {
+        inputBusqueda.value = '';
+        renderTablaActivos(activosCorrectos, true);
+      });
+
+      renderTablaActivos(activosCorrectos, true);
       panel.appendChild(activosWrap);
 
       container.appendChild(panel);
