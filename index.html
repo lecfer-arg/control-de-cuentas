@@ -366,7 +366,7 @@
 <body>
 
 <div class="topbar">
-  <span class="version-badge">V36</span>
+  <span class="version-badge">V37</span>
   <div class="topbar-inner">
     <div class="brand-mark">
       <div class="glyph">CC</div>
@@ -1502,7 +1502,8 @@
     // como "activo" si tiene al menos un cliente que no esté Dado de Baja (Al Día,
     // Deuda Saldada, Sin Pagos, Ganador Sorteo o Con Beneficios cuentan como activos).
     const todosLosClientes = sheetNames.flatMap(n => state.results[n].results);
-    const gruposTotalSet = new Set(todosLosClientes.map(r => r.codGru));
+    const { condRaw: condRawParaTotal } = getEffectiveCondRaw();
+    const gruposTotalSet = new Set(condRawParaTotal.map(c => String(c.COD_GRU).trim()));
     const gruposActivosSet = new Set();
     todosLosClientes.forEach(r => {
       const esActivo = r.esLib || r.estado !== 'DADO DE BAJA';
