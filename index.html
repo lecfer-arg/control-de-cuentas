@@ -366,7 +366,7 @@
 <body>
 
 <div class="topbar">
-  <span class="version-badge">V40</span>
+  <span class="version-badge">V41</span>
   <div class="topbar-inner">
     <div class="brand-mark">
       <div class="glyph">CC</div>
@@ -844,7 +844,7 @@
         fechaDin: opts.fechaDin || null, dineroFavor: opts.dineroFavor || null, montoDin: opts.montoDin || null,
         totalPorAbonar: opts.tpa != null ? opts.tpa : null, primerPago: null, ultimoPago: null,
         cuotaMin: opts.cuota != null ? opts.cuota : cuotaDef, cantPagos: 0, saldo: saldoTotal,
-        totalPagado: totalPagadoGlobal, totalPagadoActivo: 0,
+        totalPagado: totalPagadoGlobal, totalPagadoActivo: opts.pagado != null ? opts.pagado : 0,
         mesesSinPago: [], mesesParcial: [], cauMonto: opts.cau || 0, rtcMonto: 0,
         estado, bajaDesde: '—', obs, moneda, esLib, tieneFac, tieneFacActivo: opts.facActivo || false
       };
@@ -893,7 +893,7 @@
     if (recs.length === 0) {
       obsParts.push('MOVER A PAGOS ON LINE');
       if (chequear) obsParts.push('CHEQUEAR COMPROBANTES');
-      return base('SIN PAGOS', obsParts.join(' | '), { fechaDin: ultimaDinFecha, tpa, dineroFavor, cuota: cuotaDef, cau: cauMonto, montoDin: dinMonto, facActivo: tieneFacActivo });
+      return base('SIN PAGOS', obsParts.join(' | '), { fechaDin: ultimaDinFecha, tpa, dineroFavor, cuota: cuotaDef, cau: cauMonto, montoDin: dinMonto, facActivo: tieneFacActivo, pagado: totalPagadoActivo });
     }
 
     const primerFecha = recs[0].FECHA_EMIS;
