@@ -912,7 +912,7 @@
       Object.entries(porDestino).forEach(([destino, resDestino]) => {
         const activos = resDestino.filter(r => r.estado === 'AL DIA' || r.estado === 'SIN PAGOS');
         const totalPasajerosPagaron = resDestino.filter(r => (r.totalPagadoActivo || 0) > 0).length;
-        const totalAbonado = resDestino.reduce((a, r) => a + (r.totalPagadoActivo || 0), 0);
+        const totalAbonado = resDestino.reduce((a, r) => a + (r.totalPagado || 0), 0);
         const pendienteSinBajas = activos.reduce((a, r) => a + ((r.totalPorAbonar || 0) - (r.totalPagadoActivo || 0)), 0);
         const pctCobrado = (totalAbonado + pendienteSinBajas) > 0 ? totalAbonado / (totalAbonado + pendienteSinBajas) : null;
         const gruposUnicos = new Set(resDestino.map(r => r.codGru)).size;
