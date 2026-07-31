@@ -366,7 +366,7 @@
 <body>
 
 <div class="topbar">
-  <span class="version-badge">V37</span>
+  <span class="version-badge">V40</span>
   <div class="topbar-inner">
     <div class="brand-mark">
       <div class="glyph">CC</div>
@@ -1487,13 +1487,15 @@
     // Cálculo real de "no validados": el mismo, cliente por cliente, que usa cada
     // pestaña en su propia sección "Clientes no validados" (no una resta de totales).
     const desgloseSinValidar = [];
-    let totalBajas = 0, totalControlar = 0;
+    let totalBajas = 0, totalControlar = 0, totalSinPagos = 0, totalBeneficios = 0;
     sheetNames.forEach(n => {
       const data = state.results[n];
       const v = data.validation;
       const nSinValidar = v ? (v.faltaEnSaldos.length + v.noEnc.length) : data.results.length;
       if (nSinValidar > 0) desgloseSinValidar.push({ pestaña: n, n: nSinValidar });
       totalBajas += data.results.filter(r => r.estado === 'DADO DE BAJA').length;
+      totalSinPagos += data.results.filter(r => r.estado === 'SIN PAGOS').length;
+      totalBeneficios += data.results.filter(r => r.esLib).length;
       if (v) totalControlar += v.diffs.length;
     });
     const sinValidar = desgloseSinValidar.reduce((a, x) => a + x.n, 0);
@@ -1512,7 +1514,7 @@
     const gruposActivosHtml = `<div class="field-hint" style="margin-top:6px; font-size:13px; color:var(--ink);">
       <span class="frac" style="font-family:'IBM Plex Mono',monospace; font-weight:600;">${gruposActivosSet.size} / ${gruposTotalSet.size}</span> grupos empresarios activos</div>`;
 
-    const todoOk = totalBajas === 0 && totalControlar === 0 && sinValidar === 0;
+    const todoOk = totalBajas === 0 && totalControlar === 0 && sinValidar === 0 && totalSinPagos === 0;
     const provinciaMsg = state.provinciaActual ? state.provinciaActual : '';
 
     // Stamp banner
@@ -1529,6 +1531,8 @@
         <p>Se compararon los saldos calculados contra el archivo de saldos de referencia en las pestañas donde indicaste una relación.</p>
         <div class="big-frac">${totalCoin} / ${totalRef} clientes coinciden</div>
         ${gruposActivosHtml}
+        ${totalBeneficios > 0 ? `<p style="margin-top:8px; color:#6B21A8;">ℹ ${totalBeneficios} cliente(s) figuran Con Beneficios.</p>` : ''}
+        ${totalSinPagos > 0 ? `<p style="margin-top:8px; color:var(--stamp-red-dark);">⚠ ${totalSinPagos} pasajero(s) están Sin Pagos — necesitan un ajuste, no deberían figurar como activos.</p>` : ''}
         ${sinValidar > 0 ? `<p style="margin-top:8px; color:var(--stamp-red-dark);">⚠ ${sinValidar} cliente(s) de ${totalClientesAnalizados} analizados no se pudieron validar (no aparecen del otro lado, cuentas o "SL"). Por pestaña: ${detalleSinValidar}.</p>` : ''}`;
       banner.appendChild(copy);
     } else {
@@ -1766,6 +1770,7 @@
           let obsSimple = '';
           if (r.estado === 'GANADOR SORTEO') obsSimple = 'Ganador de Sorteo';
           else if (r.estado === 'SIN PAGOS') obsSimple = 'Cliente sin pagos';
+          else if (r.estado === 'DEUDA SALDADA') obsSimple = 'Deuda saldada';
           tr.innerHTML = `<td>${r.codGru}</td><td>${r.colegio || '—'}</td><td>${r.destino || '—'}</td><td>${r.cod}</td><td>${r.nombre}</td>
             <td class="num">${r.viajes}</td>
             <td>${r.ultimoPago ? fmtDate(r.ultimoPago) : '—'}</td>
