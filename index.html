@@ -366,7 +366,7 @@
 <body>
 
 <div class="topbar">
-  <span class="version-badge">V41</span>
+  <span class="version-badge">V42</span>
   <div class="topbar-inner">
     <div class="brand-mark">
       <div class="glyph">CC</div>
@@ -1523,13 +1523,20 @@
       const stamp = el('div', 'stamp ' + (todoOk ? 'ok' : 'warn'));
       stamp.innerHTML = todoOk
         ? `<div class="s1">CUENTAS</div><div class="s2">✓ OK</div><div class="s3">CONCILIADO</div>`
-        : `<div class="s1">CUENTAS</div><div class="s2">${totalRef - totalCoin}</div><div class="s3">A REVISAR</div>`;
+        : `<div class="s1">CUENTAS</div><div class="s2">${totalBajas + totalControlar + sinValidar + totalSinPagos}</div><div class="s3">A REVISAR</div>`;
       banner.appendChild(stamp);
       const copy = el('div', 'stamp-copy');
       const detalleSinValidar = desgloseSinValidar.map(x => `${x.pestaña} (${x.n})`).join(', ');
       copy.innerHTML = `<h3>${todoOk ? `Todas las cuentas de ${provinciaMsg} coinciden` : 'Hay diferencias para revisar'}</h3>
         <p>Se compararon los saldos calculados contra el archivo de saldos de referencia en las pestañas donde indicaste una relación.</p>
         <div class="big-frac">${totalCoin} / ${totalRef} clientes coinciden</div>
+        <div style="margin-top:10px; padding:10px 12px; background:rgba(0,0,0,0.03); border-radius:3px; font-size:13px;">
+          <strong>Para llegar a "Todo concilia" necesitás estos 4 números en 0:</strong><br>
+          Dados de Baja: <strong>${totalBajas}</strong> &nbsp;·&nbsp;
+          Clientes a controlar su saldo: <strong>${totalControlar}</strong> &nbsp;·&nbsp;
+          Clientes sin validar: <strong>${sinValidar}</strong> &nbsp;·&nbsp;
+          Sin Pagos: <strong>${totalSinPagos}</strong>
+        </div>
         ${gruposActivosHtml}
         ${totalBeneficios > 0 ? `<p style="margin-top:8px; color:#6B21A8;">ℹ ${totalBeneficios} cliente(s) figuran Con Beneficios.</p>` : ''}
         ${totalSinPagos > 0 ? `<p style="margin-top:8px; color:var(--stamp-red-dark);">⚠ ${totalSinPagos} pasajero(s) están Sin Pagos — necesitan un ajuste, no deberían figurar como activos.</p>` : ''}
