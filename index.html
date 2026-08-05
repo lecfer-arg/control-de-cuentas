@@ -366,7 +366,7 @@
 <body>
 
 <div class="topbar">
-  <span class="version-badge">V42</span>
+  <span class="version-badge">V43</span>
   <div class="topbar-inner">
     <div class="brand-mark">
       <div class="glyph">CC</div>
@@ -1527,19 +1527,19 @@
       banner.appendChild(stamp);
       const copy = el('div', 'stamp-copy');
       const detalleSinValidar = desgloseSinValidar.map(x => `${x.pestaña} (${x.n})`).join(', ');
-      copy.innerHTML = `<h3>${todoOk ? `Todas las cuentas de ${provinciaMsg} coinciden` : 'Hay diferencias para revisar'}</h3>
+      copy.innerHTML = `<div style="font-size:11.5px; color:#A39B84; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px;">${provinciaMsg}</div>
+        <h3>${todoOk ? 'Todo OK! no queda nada por ajustar' : 'Hay diferencias para revisar'}</h3>
         <p>Se compararon los saldos calculados contra el archivo de saldos de referencia en las pestañas donde indicaste una relación.</p>
         <div class="big-frac">${totalCoin} / ${totalRef} clientes coinciden</div>
-        <div style="margin-top:10px; padding:10px 12px; background:rgba(0,0,0,0.03); border-radius:3px; font-size:13px;">
-          <strong>Para llegar a "Todo concilia" necesitás estos 4 números en 0:</strong><br>
-          Dados de Baja: <strong>${totalBajas}</strong> &nbsp;·&nbsp;
-          Clientes a controlar su saldo: <strong>${totalControlar}</strong> &nbsp;·&nbsp;
-          Clientes sin validar: <strong>${sinValidar}</strong> &nbsp;·&nbsp;
+        ${gruposActivosHtml}
+        <div style="margin-top:10px; padding:10px 12px; background:rgba(0,0,0,0.03); border-radius:3px; font-size:13px; line-height:1.9;">
+          <strong>Para llegar a "Todo OK" necesitás estos 4 números en 0:</strong><br>
+          Dados de Baja: <strong>${totalBajas}</strong><br>
+          Clientes a controlar su saldo: <strong>${totalControlar}</strong><br>
+          Clientes sin validar: <strong>${sinValidar}</strong><br>
           Sin Pagos: <strong>${totalSinPagos}</strong>
         </div>
-        ${gruposActivosHtml}
         ${totalBeneficios > 0 ? `<p style="margin-top:8px; color:#6B21A8;">ℹ ${totalBeneficios} cliente(s) figuran Con Beneficios.</p>` : ''}
-        ${totalSinPagos > 0 ? `<p style="margin-top:8px; color:var(--stamp-red-dark);">⚠ ${totalSinPagos} pasajero(s) están Sin Pagos — necesitan un ajuste, no deberían figurar como activos.</p>` : ''}
         ${sinValidar > 0 ? `<p style="margin-top:8px; color:var(--stamp-red-dark);">⚠ ${sinValidar} cliente(s) de ${totalClientesAnalizados} analizados no se pudieron validar (no aparecen del otro lado, cuentas o "SL"). Por pestaña: ${detalleSinValidar}.</p>` : ''}`;
       banner.appendChild(copy);
     } else {
