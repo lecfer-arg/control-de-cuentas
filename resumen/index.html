@@ -181,7 +181,7 @@
   }
 })(typeof self !== 'undefined' ? self : this, function () {
 
-  const CONOCIDOS = new Set(['CAU','DIN','DTO','NOV','REC','RNV','REI','FVR','RTC','TSC','LIB','RSC','AJD','ACT','NOP','AJC','N/D','N/C']);
+  const CONOCIDOS = new Set(['CAU','DIN','DTO','NOV','REC','RNV','REI','FVR','RTC','TSC','LIB','RSC','AJD','ACT','NOP','AJC','N/D']);
 
   function toF(s) {
     if (s === null || s === undefined) return null;
@@ -418,18 +418,11 @@
     const ajd = sumWhere(bloque, 'DEBE', ['AJD']);
     const ajdCancela = Math.abs(ajd - credito) < 0.05 && credito > 0;
     const tpaC = sumWhere(bloque, 'DEBE', ['CAU', 'DIN', 'RTC', 'ACT', 'TSC', 'N/D', 'FVR']);
+    // N/C solo se usa para anular una FAC previa con ESTADO = CAN (cancelada).
+    // Igual que FAC/CIN, no es un descuento real al cliente, por eso no entra en CONOCIDOS
+    // ni se trata nunca como tipo de descuento (ver config.tiposDescuento más abajo).
     const tiposDescuento = (config && config.tiposDescuento) || ['DTO', 'LIB', 'NOP'];
-    const tiposDescuentoSinNC = tiposDescuento.filter(t => t !== 'N/C');
-    let tpaD = sumWhere(bloque, 'HABER', tiposDescuentoSinNC);
-    if (tiposDescuento.includes('N/C')) {
-      // Un N/C el mismo día que un FAC es una corrección/reversión interna (anula el FAC,
-      // que a su vez tampoco suma) — no debe tratarse como un descuento real de deuda.
-      // Un N/C sin FAC el mismo día sí es un descuento real y se resta normalmente.
-      bloque.filter(r => r.T_COMP === 'N/C').forEach(nc => {
-        const facMismoDia = bloque.some(r => r.T_COMP === 'FAC' && r.FECHA_EMIS.getTime() === nc.FECHA_EMIS.getTime());
-        if (!facMismoDia) tpaD += (nc.HABER || 0);
-      });
-    }
+    const tpaD = sumWhere(bloque, 'HABER', tiposDescuento);
     let tpa;
     if (ajdCancela) {
       tpa = tpaC - tpaD;
@@ -1093,7 +1086,7 @@
       const baseConfig = {
         fechaCorte: null, lastEval,
         excepcionesCliente: Object.assign({}, tags.cuotas), pagosDiferidos: Object.assign({}, tags.diferidos),
-        ganadorSorteo: new Set([...tags.sorteo]), nobajas: tags.nobajas, tiposDescuento: ['DTO', 'LIB', 'NOP', 'N/C', 'AJC'],
+        ganadorSorteo: new Set([...tags.sorteo]), nobajas: tags.nobajas, tiposDescuento: ['DTO', 'LIB', 'NOP', 'AJC'],
       };
 
       const results = {};
