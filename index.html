@@ -672,7 +672,7 @@
     if (ajdCancela) {
       tpa = tpaC - tpaD;
     } else {
-      const ajdTpa = bloque.filter(r => r.T_COMP === 'AJD' && r.SALDO !== 0).reduce((a, r) => a + (r.DEBE || 0), 0);
+      const ajdTpa = bloque.filter(r => r.T_COMP === 'AJD').reduce((a, r) => a + (r.DEBE || 0), 0);
       tpa = tpaC + ajdTpa - credito + deuda - tpaD;
     }
 
