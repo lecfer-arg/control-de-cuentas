@@ -1927,7 +1927,7 @@
     const porDia = new Array(dias).fill(0);
     (data.recibosMes || []).forEach(p => { porDia[p.f.getUTCDate() - 1] += p.m; });
     const totalMes = porDia.reduce((a, b) => a + b, 0);
-    wrap.appendChild(titulo(`Flujo de dinero por día — ${String(M).padStart(2, '0')}/${Y} (total ${fmtNum(totalMes, moneda)})`));
+    wrap.appendChild(titulo(`Flujo de dinero por día — ${String(M).padStart(2, '0')}/${Y}`));
     const max = Math.max(...porDia, 1);
     const conIng = porDia.filter(v => v > 0);
     const min = conIng.length ? Math.min(...conIng) : 0;
@@ -1938,8 +1938,13 @@
     porDia.forEach((v, i) => {
       const h = (H - pb - pt) * v / max;
       const x = pl + i * bw + 1;
-      svg += `<rect x="${x.toFixed(1)}" y="${(H - pb - h).toFixed(1)}" width="${Math.max(bw - 2, 1).toFixed(1)}" height="${h.toFixed(1)}" fill="${i === iMax && v > 0 ? '#00ACC1' : i === iMin ? '#D32F2F' : '#4A4A4A'}"><title>Día ${i + 1}: ${esc(fmtNum(v, moneda))}</title></rect>`;
-      if ((i + 1) % 2 === 1 || dias <= 16) svg += `<text x="${(x + bw / 2 - 1).toFixed(1)}" y="${H - 8}" text-anchor="middle" fill="#666">${i + 1}</text>`;
+      const esMax = i === iMax && v > 0, esMin = i === iMin;
+      const col = esMax ? '#00ACC1' : esMin ? '#D32F2F' : '#4A4A4A';
+      const colOsc = esMax ? '#006064' : '#7F0000';
+      const anim = (esMax || esMin) ? `<animate attributeName="fill" values="${col};${colOsc};${col}" dur="1.4s" repeatCount="indefinite"/>` : '';
+      svg += `<rect x="${x.toFixed(1)}" y="${(H - pb - h).toFixed(1)}" width="${Math.max(bw - 2, 1).toFixed(1)}" height="${h.toFixed(1)}" fill="${col}">${anim}<title>Día ${i + 1}: ${esc(fmtNum(v, moneda))}</title></rect>`;
+      const esDom = new Date(Date.UTC(Y, M - 1, i + 1)).getUTCDay() === 0;
+      svg += `<text x="${(x + bw / 2 - 1).toFixed(1)}" y="${H - 8}" text-anchor="middle" fill="${esDom ? '#111' : '#666'}" font-weight="${esDom ? '800' : '400'}">${i + 1}</text>`;
     });
     svg += `<text x="${pl}" y="10" fill="#666">máx. día: ${esc(fmtNum(max === 1 && totalMes === 0 ? 0 : max, moneda))}</text></svg>`;
     const chart = el('div'); chart.innerHTML = svg; wrap.appendChild(chart);
