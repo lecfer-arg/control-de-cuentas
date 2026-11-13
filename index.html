@@ -1856,8 +1856,8 @@
       d.style.cssText = 'font-family:"IBM Plex Serif",serif; font-weight:700; font-size:14.5px; text-transform:uppercase; letter-spacing:0.03em; border-bottom:2px solid var(--paper-line); padding-bottom:6px; margin:6px 0 12px;';
       return d;
     };
-    wrap.appendChild(titulo('Dashboard — pasajeros vigentes por colegio'));
-    const nota = el('div', 'field-hint', 'Vigentes = Al día + Deuda saldada + Con beneficios.');
+    wrap.appendChild(titulo('Dashboard — pasajeros activos por colegio'));
+    const nota = el('div', 'field-hint', 'Pasajeros activos = Al día + Deuda saldada + Con beneficios.');
     nota.style.marginBottom = '10px';
     wrap.appendChild(nota);
 
@@ -1871,31 +1871,35 @@
     const filas = [...mapa.values()].sort((a, b) => (a.destino.localeCompare(b.destino)) || (a.colegio.localeCompare(b.colegio)) || (String(a.codGru).localeCompare(String(b.codGru), undefined, { numeric: true })));
     const scrollA = el('div', 'table-scroll');
     const tA = el('table', 'ledger');
-    tA.innerHTML = `<thead><tr><th>Grupo empresario</th><th>Colegio</th><th>Destino</th><th class="num">Pasajeros al día</th></tr></thead>`;
+    tA.innerHTML = `<thead><tr><th>Grupo empresario</th><th>Colegio</th><th>Provincia</th><th>Destino</th><th class="num">Pasajeros activos</th></tr></thead>`;
     const tbA = el('tbody');
     filas.forEach(f => {
       const tr = el('tr');
-      tr.innerHTML = `<td>${esc(f.codGru)}${f.nombreGru ? ' — ' + esc(f.nombreGru) : ''}</td><td>${esc(f.colegio)}</td><td>${esc(f.destino)}</td><td class="num">${f.n}</td>`;
+      tr.innerHTML = `<td>${esc(f.codGru)}${f.nombreGru ? ' — ' + esc(f.nombreGru) : ''}</td><td>${esc(f.colegio)}</td><td>${esc(state.provinciaActual || '—')}</td><td>${esc(f.destino)}</td><td class="num">${f.n}</td>`;
       tbA.appendChild(tr);
     });
     const trT = el('tr');
-    trT.innerHTML = `<td colspan="3"><strong>Total</strong></td><td class="num"><strong>${vig.length}</strong></td>`;
+    trT.innerHTML = `<td colspan="4"><strong>Total</strong></td><td class="num"><strong>${vig.length}</strong></td>`;
     tbA.appendChild(trT);
     tA.appendChild(tbA); scrollA.appendChild(tA); wrap.appendChild(scrollA);
 
     // B) totales y ticket promedio por destino
     wrap.appendChild(titulo('Totales por destino'));
+    const [Y, M] = buildConfig().lastEval;
     const dest = new Map();
-    vig.forEach(r => {
+    data.results.forEach(r => {
       const d = r.destino || '—';
       if (!dest.has(d)) dest.set(d, { n: 0, suma: 0, nT: 0 });
-      const o = dest.get(d); o.n++;
-      const ps = (r.pagos || []).filter(p => p.m > 0);
-      if (ps.length) { o.suma += ps[ps.length - 1].m; o.nT++; }
+      const o = dest.get(d);
+      if (vigente(r)) o.n++;
+      (r.pagos || []).forEach(p => {
+        const f = p.f;
+        if (p.m > 0 && f && f.getUTCFullYear() === Y && f.getUTCMonth() + 1 === M) { o.suma += p.m; o.nT++; }
+      });
     });
     const scrollB = el('div', 'table-scroll');
     const tB = el('table', 'ledger');
-    tB.innerHTML = `<thead><tr><th>Destino</th><th class="num">Pasajeros vigentes</th><th class="num">Ticket promedio (último pago registrado)</th></tr></thead>`;
+    tB.innerHTML = `<thead><tr><th>Destino</th><th class="num">Pasajeros activos</th><th class="num">Ticket promedio (recibos del mes)</th></tr></thead>`;
     const tbB = el('tbody');
     [...dest.entries()].sort((a, b) => b[1].n - a[1].n).forEach(([d, o]) => {
       const tr = el('tr');
@@ -1905,8 +1909,6 @@
     tB.appendChild(tbB); scrollB.appendChild(tB); wrap.appendChild(scrollB);
 
     // C) flujo de dinero por día en el mes analizado
-    const le = buildConfig().lastEval;
-    const [Y, M] = le;
     const dias = new Date(Date.UTC(Y, M, 0)).getUTCDate();
     const porDia = new Array(dias).fill(0);
     data.results.forEach(r => (r.pagos || []).forEach(p => {
@@ -1916,18 +1918,21 @@
     const totalMes = porDia.reduce((a, b) => a + b, 0);
     wrap.appendChild(titulo(`Flujo de dinero por día — ${String(M).padStart(2, '0')}/${Y} (total ${fmtNum(totalMes, moneda)})`));
     const max = Math.max(...porDia, 1);
+    const conIng = porDia.filter(v => v > 0);
+    const min = conIng.length ? Math.min(...conIng) : 0;
+    const iMax = porDia.indexOf(Math.max(...porDia)), iMin = conIng.length > 1 ? porDia.indexOf(min) : -1;
     const W = 760, H = 220, pl = 8, pb = 22, pt = 14, bw = (W - pl * 2) / dias;
     let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%; max-width:${W}px; height:auto; font-family:'IBM Plex Mono',monospace; font-size:9px;" role="img" aria-label="Flujo de dinero por día">`;
     svg += `<line x1="${pl}" y1="${H - pb}" x2="${W - pl}" y2="${H - pb}" stroke="#888" stroke-width="1"/>`;
     porDia.forEach((v, i) => {
       const h = (H - pb - pt) * v / max;
       const x = pl + i * bw + 1;
-      svg += `<rect x="${x.toFixed(1)}" y="${(H - pb - h).toFixed(1)}" width="${Math.max(bw - 2, 1).toFixed(1)}" height="${h.toFixed(1)}" fill="#2F6B4F"><title>Día ${i + 1}: ${esc(fmtNum(v, moneda))}</title></rect>`;
+      svg += `<rect x="${x.toFixed(1)}" y="${(H - pb - h).toFixed(1)}" width="${Math.max(bw - 2, 1).toFixed(1)}" height="${h.toFixed(1)}" fill="${i === iMax && v > 0 ? '#00ACC1' : i === iMin ? '#D32F2F' : '#4A4A4A'}"><title>Día ${i + 1}: ${esc(fmtNum(v, moneda))}</title></rect>`;
       if ((i + 1) % 2 === 1 || dias <= 16) svg += `<text x="${(x + bw / 2 - 1).toFixed(1)}" y="${H - 8}" text-anchor="middle" fill="#666">${i + 1}</text>`;
     });
     svg += `<text x="${pl}" y="10" fill="#666">máx. día: ${esc(fmtNum(max === 1 && totalMes === 0 ? 0 : max, moneda))}</text></svg>`;
     const chart = el('div'); chart.innerHTML = svg; wrap.appendChild(chart);
-    const hint = el('div', 'field-hint', 'Suma de recibos (REC/RSC) del viaje actual de los clientes de esta pestaña, por día de emisión del mes analizado.');
+    const hint = el('div', 'field-hint', 'Gris: ingreso diario. Cian: día de mayor ingreso. Rojo: día de menor ingreso (entre los días con ingresos). Suma de recibos (REC/RSC) del viaje actual de los clientes de esta pestaña, por día de emisión del mes analizado.');
     hint.style.marginTop = '6px';
     wrap.appendChild(hint);
     return wrap;
