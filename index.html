@@ -1840,7 +1840,7 @@
       renderTablaActivos(activosCorrectos, true);
       panel.appendChild(activosWrap);
 
-      panel.appendChild(buildDashboard(data));
+      panel.appendChild(buildDashboard(data, n));
 
       container.appendChild(panel);
     });
@@ -1856,7 +1856,7 @@
 
 
   // ---------- Dashboard por pestaña ----------
-  function buildDashboard(data) {
+  function buildDashboard(data, nombreHoja) {
     const moneda = data.moneda;
     const wrap = el('div', 'dashboard');
     wrap.style.cssText = 'margin-top:26px; border:1px solid var(--paper-line); border-radius:3px; padding:18px 20px; background:var(--paper-raised);';
@@ -1869,7 +1869,7 @@
       d.style.cssText = 'font-family:"IBM Plex Serif",serif; font-weight:700; font-size:14.5px; text-transform:uppercase; letter-spacing:0.03em; border-bottom:2px solid var(--paper-line); padding-bottom:6px; margin:6px 0 12px;';
       return d;
     };
-    wrap.appendChild(titulo('Dashboard — pasajeros activos por colegio'));
+    wrap.appendChild(titulo(`${esc(nombreHoja || '')} - Pasajeros activos por colegio y destino`));
     const nota = el('div', 'field-hint', 'Pasajeros activos = Al día + Deuda saldada + Con beneficios.');
     nota.style.marginBottom = '10px';
     wrap.appendChild(nota);
@@ -1881,7 +1881,7 @@
       if (!mapa.has(k)) mapa.set(k, { codGru: r.codGru, nombreGru: r.nombreGru || '', colegio: r.colegio || '—', destino: r.destino || '—', n: 0 });
       mapa.get(k).n++;
     });
-    const filas = [...mapa.values()].sort((a, b) => (a.destino.localeCompare(b.destino)) || (a.colegio.localeCompare(b.colegio)) || (String(a.codGru).localeCompare(String(b.codGru), undefined, { numeric: true })));
+    const filas = [...mapa.values()].sort((a, b) => (b.n - a.n) || (a.destino.localeCompare(b.destino)) || (a.colegio.localeCompare(b.colegio)) || (String(a.codGru).localeCompare(String(b.codGru), undefined, { numeric: true })));
     const scrollA = el('div', 'table-scroll');
     const tA = el('table', 'ledger');
     tA.innerHTML = `<thead><tr><th>Grupo empresario</th><th>Colegio</th><th>Provincia</th><th>Destino</th><th class="num">Pasajeros activos</th></tr></thead>`;
