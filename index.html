@@ -644,6 +644,13 @@
         let tscEntre = 0;
         for (let i = idxNov + 1; i < pidx; i++) if (grp[i].T_COMP === 'TSC') tscEntre += (grp[i].DEBE || 0);
         if (tscEntre > 0) credito = Math.max(0, credito - tscEntre);
+        // Un REI entre el NOV y el nuevo viaje es una devolución/cancelación de ese crédito
+        // (la empresa le reintegró al cliente el saldo a favor que había dejado el NOV),
+        // así que ya no está disponible para descontar del nuevo viaje. Se resta del crédito
+        // (sin bajar de 0).
+        let reiEntre = 0;
+        for (let i = idxNov + 1; i < pidx; i++) if (grp[i].T_COMP === 'REI') reiEntre += (grp[i].DEBE || 0) + (grp[i].HABER || 0);
+        if (reiEntre > 0) credito = Math.max(0, credito - reiEntre);
         for (let i = idxNov + 1; i < pidx; i++) if (grp[i].T_COMP === 'REC' || grp[i].T_COMP === 'RSC') recsEntre.push(grp[i]);
       }
     } else if (novBloqueIdxs.length > 0) {
