@@ -1460,7 +1460,20 @@
             validation = { coinciden, total: refRows.length, diffs, noEnc, faltaEnSaldos, sheetRef: `SL ${s.name}` };
           }
 
-          results[s.name] = { results: res, counts, validation, moneda };
+          // Recibos (REC/RSC) del mes analizado, directo de los comprobantes de la hoja
+          // (no depende del viaje activo de cada cliente).
+          const recibosMes = [];
+          (s.rows || []).forEach(row => {
+            const t = String(row.T_COMP || '').trim().toUpperCase();
+            if (t !== 'REC' && t !== 'RSC') return;
+            const f = LedgerLogic.parseDate(row.FECHA_EMIS);
+            if (!f || f.getUTCFullYear() !== baseConfig.lastEval[0] || f.getUTCMonth() + 1 !== baseConfig.lastEval[1]) return;
+            const m = Number(row.HABER) || 0;
+            if (m <= 0) return;
+            const di = getDestinoInfo(codGruToNombre[String(row.COD_GRU).trim()]);
+            recibosMes.push({ f, m, destino: di.label });
+          });
+          results[s.name] = { results: res, counts, validation, moneda, recibosMes };
         });
 
         state.results = results;
@@ -1892,10 +1905,11 @@
       if (!dest.has(d)) dest.set(d, { n: 0, suma: 0, nT: 0 });
       const o = dest.get(d);
       if (vigente(r)) o.n++;
-      (r.pagos || []).forEach(p => {
-        const f = p.f;
-        if (p.m > 0 && f && f.getUTCFullYear() === Y && f.getUTCMonth() + 1 === M) { o.suma += p.m; o.nT++; }
-      });
+    });
+    (data.recibosMes || []).forEach(p => {
+      const d = p.destino || '—';
+      if (!dest.has(d)) dest.set(d, { n: 0, suma: 0, nT: 0 });
+      const o = dest.get(d); o.suma += p.m; o.nT++;
     });
     const scrollB = el('div', 'table-scroll');
     const tB = el('table', 'ledger');
@@ -1911,10 +1925,7 @@
     // C) flujo de dinero por día en el mes analizado
     const dias = new Date(Date.UTC(Y, M, 0)).getUTCDate();
     const porDia = new Array(dias).fill(0);
-    data.results.forEach(r => (r.pagos || []).forEach(p => {
-      const f = p.f;
-      if (f && f.getUTCFullYear() === Y && f.getUTCMonth() + 1 === M) porDia[f.getUTCDate() - 1] += p.m;
-    }));
+    (data.recibosMes || []).forEach(p => { porDia[p.f.getUTCDate() - 1] += p.m; });
     const totalMes = porDia.reduce((a, b) => a + b, 0);
     wrap.appendChild(titulo(`Flujo de dinero por día — ${String(M).padStart(2, '0')}/${Y} (total ${fmtNum(totalMes, moneda)})`));
     const max = Math.max(...porDia, 1);
@@ -1932,7 +1943,7 @@
     });
     svg += `<text x="${pl}" y="10" fill="#666">máx. día: ${esc(fmtNum(max === 1 && totalMes === 0 ? 0 : max, moneda))}</text></svg>`;
     const chart = el('div'); chart.innerHTML = svg; wrap.appendChild(chart);
-    const hint = el('div', 'field-hint', 'Gris: ingreso diario. Cian: día de mayor ingreso. Rojo: día de menor ingreso (entre los días con ingresos). Suma de recibos (REC/RSC) del viaje actual de los clientes de esta pestaña, por día de emisión del mes analizado.');
+    const hint = el('div', 'field-hint', `Gris: ingreso diario. Cian: día de mayor ingreso. Rojo: día de menor ingreso (entre los días con ingresos). Suma de recibos (REC/RSC) de esta pestaña por fecha de emisión en el mes analizado (${(data.recibosMes || []).length} recibos).`);
     hint.style.marginTop = '6px';
     wrap.appendChild(hint);
     return wrap;
