@@ -914,6 +914,12 @@
     let sf = 0, bajaYm = null;
     const mesesDetalle = [], mesesSinPago = [], mesesParcial = [];
 
+    // Margen de error para el pago mínimo mensual en cuentas en USD: algunos pasajeros
+    // pagan en pesos y la conversión a USD (según la cotización del día) puede quedar
+    // unos centavos por debajo del mínimo (ej: $50 USD exactos dan 49,82 USD). Para no
+    // dar de baja por centavos, se tolera hasta 0,99 USD por debajo del mínimo del mes
+    // (si el mínimo es 50 USD, se acepta desde 49,01 USD; si es 100 USD, desde 99,01 USD).
+    const margenUsd = (moneda === 'USD') ? 0.99 : 0;
     allMonths.forEach((ym, i) => {
       const k = `${ym[0]}-${ym[1]}`;
       const pagadoMes = monthlyAdj[k] || 0;
@@ -924,6 +930,7 @@
       let status;
       if (!cuotaMes) { status = 'OK'; sf = totalDisp; }
       else if (totalDisp >= cuotaMes) { status = 'OK'; sf = totalDisp - cuotaMes; }
+      else if (totalDisp >= cuotaMes - margenUsd) { status = 'OK'; sf = 0; }
       else if (totalDisp > 0) { status = 'PARCIAL'; sf = 0; bajaYm = ym; mesesParcial.push(ym); }
       else { status = 'SIN PAGO'; sf = 0; bajaYm = ym; mesesSinPago.push(ym); }
       mesesDetalle.push({ ym, status });
