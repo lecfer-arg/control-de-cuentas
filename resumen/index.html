@@ -118,6 +118,7 @@
           <option value="SALTA">Salta</option>
           <option value="JUJUY">Jujuy</option>
           <option value="CATAMARCA">Catamarca</option>
+          <option value="TODAS">TODAS</option>
         </select>
         <div class="field-hint">Trae las cuentas, saldos y condiciones desde Google Sheets y arma el resumen automáticamente. Evalúa siempre hasta el mes anterior al actual.</div>
       </div>
@@ -966,7 +967,7 @@
     if (!sheetNames.length) { cont.appendChild(el('div', 'empty-note', 'No se encontraron datos para esta provincia.')); return; }
 
     const resumenWrap = el('div', 'resumen-global');
-    const h3 = el('h3', 'display', `Resumen de ${provincia}`);
+    const h3 = el('h3', 'display', provincia === 'TODAS' ? 'Resumen general — todas las provincias' : `Resumen de ${provincia}`);
     h3.style.cssText = 'margin:0 0 4px; font-size:19px; color:var(--ink);';
     resumenWrap.appendChild(h3);
     resumenWrap.appendChild(el('div', 'field-hint', 'Consolidado de todas las pestañas analizadas, separado por moneda.'));
@@ -1077,52 +1078,88 @@
     cont.appendChild(resumenWrap);
   }
 
+  // Descarga y analiza una provincia. Devuelve { results, lastEval, nCuentas, nCond }.
+  async function analizarProvincia(provincia) {
+    const condTitles = await gsFetchSheetTitles(GS_SHEET_IDS.CONDICIONES);
+    const condMatch = condTitles.find(t => t.toUpperCase() === provincia);
+    if (!condMatch) throw new Error(`No se encontró la pestaña "${provincia}" en el archivo de Condiciones.`);
+    const condValues = await gsFetchValuesBatch(GS_SHEET_IDS.CONDICIONES, [condMatch]);
+    const condRaw = condRawFromAOA(condValues[condMatch] || []);
+    const tags = extraerTodosLosTags(condRaw);
+
+    const spreadsheetId = GS_SHEET_IDS[provincia];
+    const allTitles = await gsFetchSheetTitles(spreadsheetId);
+    const cuentasTitles = allTitles.filter(t => !/^SL\s/i.test(t.trim()));
+    const allValues = await gsFetchValuesBatch(spreadsheetId, allTitles);
+
+    const codGruToNombre = {};
+    condRaw.forEach(r => { codGruToNombre[String(r.COD_GRU).trim()] = r.NOMBRE_GRU; });
+
+    const lastEval = mesAnteriorAlActual();
+    const baseConfig = {
+      fechaCorte: null, lastEval,
+      excepcionesCliente: Object.assign({}, tags.cuotas), pagosDiferidos: Object.assign({}, tags.diferidos),
+      ganadorSorteo: new Set([...tags.sorteo]), nobajas: tags.nobajas, tiposDescuento: ['DTO', 'LIB', 'NOP', 'AJC'],
+    };
+
+    const results = {};
+    cuentasTitles.forEach(name => {
+      const rows = cuentasRowsFromAOA(allValues[name] || []);
+      if (!rows.length) return;
+      const moneda = guessMoneda(name);
+      const { results: res } = LedgerLogic.procesarHoja(rows, condRaw, Object.assign({}, baseConfig, { moneda }));
+      res.forEach(r => { r.destino = getDestinoInfo(codGruToNombre[r.codGru]).label; });
+      results[name] = { results: res, moneda };
+    });
+    return { results, lastEval, nCuentas: cuentasTitles.length, nCond: condRaw.length };
+  }
+
+  const PROVINCIAS = ['TUCUMAN', 'SALTA', 'JUJUY', 'CATAMARCA'];
+  let cargaSeq = 0;
+
   async function cargarYRenderizar(provincia) {
+    const seq = ++cargaSeq;
     $('resumen-contenedor').innerHTML = '';
-    setCargaEstado(`⟳ Cargando datos de ${provincia} desde Google Sheets...`, 'cargando');
+    const etiqueta = provincia === 'TODAS' ? 'todas las provincias' : provincia;
+    setCargaEstado(`⟳ Cargando datos de ${etiqueta} desde Google Sheets...`, 'cargando');
     try {
-      const condTitles = await gsFetchSheetTitles(GS_SHEET_IDS.CONDICIONES);
-      const condMatch = condTitles.find(t => t.toUpperCase() === provincia);
-      if (!condMatch) throw new Error(`No se encontró la pestaña "${provincia}" en el archivo de Condiciones.`);
-      const condValues = await gsFetchValuesBatch(GS_SHEET_IDS.CONDICIONES, [condMatch]);
-      const condRaw = condRawFromAOA(condValues[condMatch] || []);
-      const tags = extraerTodosLosTags(condRaw);
-
-      const spreadsheetId = GS_SHEET_IDS[provincia];
-      const allTitles = await gsFetchSheetTitles(spreadsheetId);
-      const cuentasTitles = allTitles.filter(t => !/^SL\s/i.test(t.trim()));
-      const allValues = await gsFetchValuesBatch(spreadsheetId, allTitles);
-
-      const codGruToNombre = {};
-      condRaw.forEach(r => { codGruToNombre[String(r.COD_GRU).trim()] = r.NOMBRE_GRU; });
-
-      const lastEval = mesAnteriorAlActual();
-      const baseConfig = {
-        fechaCorte: null, lastEval,
-        excepcionesCliente: Object.assign({}, tags.cuotas), pagosDiferidos: Object.assign({}, tags.diferidos),
-        ganadorSorteo: new Set([...tags.sorteo]), nobajas: tags.nobajas, tiposDescuento: ['DTO', 'LIB', 'NOP', 'AJC'],
-      };
-
-      const results = {};
-      cuentasTitles.forEach(name => {
-        const rows = cuentasRowsFromAOA(allValues[name] || []);
-        if (!rows.length) return;
-        const moneda = guessMoneda(name);
-        const { results: res } = LedgerLogic.procesarHoja(rows, condRaw, Object.assign({}, baseConfig, { moneda }));
-        res.forEach(r => { r.destino = getDestinoInfo(codGruToNombre[r.codGru]).label; });
-        results[name] = { results: res, moneda };
-      });
-
-      renderResumen(provincia, results);
-      setCargaEstado(`✓ ${provincia} actualizado — ${cuentasTitles.length} pestaña(s), ${condRaw.length} grupos en condiciones. Evaluado hasta ${String(lastEval[1]).padStart(2,'0')}/${lastEval[0]}.`, 'ok');
+      if (provincia !== 'TODAS') {
+        const r = await analizarProvincia(provincia);
+        if (seq !== cargaSeq) return;
+        renderResumen(provincia, r.results);
+        setCargaEstado(`✓ ${provincia} actualizado — ${r.nCuentas} pestaña(s), ${r.nCond} grupos en condiciones. Evaluado hasta ${String(r.lastEval[1]).padStart(2,'0')}/${r.lastEval[0]}.`, 'ok');
+        return;
+      }
+      // TODAS: se analiza cada provincia y se suman los datos por pestaña (año/moneda) y destino.
+      const merged = {};
+      const fallas = [];
+      let lastEval = null, nCuentas = 0;
+      for (const prov of PROVINCIAS) {
+        if (seq !== cargaSeq) return;
+        setCargaEstado(`⟳ Cargando ${prov} (${PROVINCIAS.indexOf(prov) + 1}/${PROVINCIAS.length})...`, 'cargando');
+        try {
+          const r = await analizarProvincia(prov);
+          lastEval = r.lastEval; nCuentas += r.nCuentas;
+          Object.entries(r.results).forEach(([name, d]) => {
+            if (!merged[name]) merged[name] = { results: [], moneda: d.moneda };
+            // el código de grupo se prefija con la provincia para no mezclar grupos de distintas provincias
+            d.results.forEach(x => merged[name].results.push(Object.assign({}, x, { codGru: prov + ':' + x.codGru })));
+          });
+        } catch (err) { fallas.push(`${prov}: ${err.message}`); }
+      }
+      if (seq !== cargaSeq) return;
+      renderResumen('TODAS', merged);
+      if (fallas.length) setCargaEstado(`⚠ Resumen general incompleto — no se pudo cargar: ${fallas.join(' | ')}`, 'error');
+      else setCargaEstado(`✓ Todas las provincias actualizadas — ${nCuentas} pestaña(s) en total. Evaluado hasta ${String(lastEval[1]).padStart(2,'0')}/${lastEval[0]}.`, 'ok');
     } catch (err) {
-      setCargaEstado(`⚠ No se pudo actualizar ${provincia}: ${err.message}`, 'error');
+      if (seq !== cargaSeq) return;
+      setCargaEstado(`⚠ No se pudo actualizar ${etiqueta}: ${err.message}`, 'error');
     }
   }
 
   $('sel-provincia-global').addEventListener('change', (e) => {
     const prov = e.target.value;
-    if (!prov) { $('resumen-contenedor').innerHTML = ''; $('carga-estado').style.display = 'none'; return; }
+    if (!prov) { cargaSeq++; $('resumen-contenedor').innerHTML = ''; $('carga-estado').style.display = 'none'; return; }
     cargarYRenderizar(prov);
   });
 
