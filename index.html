@@ -1466,7 +1466,7 @@
             const m = Number(row.HABER) || 0;
             if (m <= 0) return;
             const di = getDestinoInfo(codGruToNombre[String(row.COD_GRU).trim()]);
-            recibosMes.push({ f, m, destino: di.label });
+            recibosMes.push({ f, m, destino: di.label, cod: row.COD_CLI, nombre: row.RAZON_SOC });
           });
           results[s.name] = { results: res, counts, validation, moneda, recibosMes };
         });
@@ -1900,31 +1900,36 @@
       tA.appendChild(tbA); scrollA.appendChild(tA); wrap.appendChild(scrollA);
     });
 
-    // B) totales y ticket promedio por destino
-    wrap.appendChild(titulo('Totales por destino'));
+    // B) pasajeros con pagos (REC/RSC) en el mes analizado, de mayor a menor monto
     const [Y, M] = buildConfig().lastEval;
-    const dest = new Map();
-    data.results.forEach(r => {
-      const d = r.destino || '—';
-      if (!dest.has(d)) dest.set(d, { n: 0, suma: 0, nT: 0 });
-      const o = dest.get(d);
-      if (vigente(r)) o.n++;
-    });
+    const fmtF = (f) => `${String(f.getUTCDate()).padStart(2, '0')}/${String(f.getUTCMonth() + 1).padStart(2, '0')}`;
+    const porCli = new Map();
     (data.recibosMes || []).forEach(p => {
-      const d = p.destino || '—';
-      if (!dest.has(d)) dest.set(d, { n: 0, suma: 0, nT: 0 });
-      const o = dest.get(d); o.suma += p.m; o.nT++;
+      const k = String(p.cod);
+      if (!porCli.has(k)) porCli.set(k, { cod: p.cod, nombre: p.nombre || '', total: 0, pagos: [] });
+      const o = porCli.get(k); o.total += p.m; o.pagos.push(p);
     });
-    const scrollB = el('div', 'table-scroll');
-    const tB = el('table', 'ledger');
-    tB.innerHTML = `<thead><tr><th>Destino</th><th class="num">Pasajeros activos</th><th class="num">Ticket promedio (recibos del mes)</th></tr></thead>`;
-    const tbB = el('tbody');
-    [...dest.entries()].sort((a, b) => b[1].n - a[1].n).forEach(([d, o]) => {
-      const tr = el('tr');
-      tr.innerHTML = `<td>${esc(d)}</td><td class="num">${o.n}</td><td class="num">${o.nT ? fmtNum(o.suma / o.nT, moneda) : '—'}</td>`;
-      tbB.appendChild(tr);
-    });
-    tB.appendChild(tbB); scrollB.appendChild(tB); wrap.appendChild(scrollB);
+    const listado = [...porCli.values()].sort((a, b) => (b.total - a.total) || String(a.cod).localeCompare(String(b.cod), undefined, { numeric: true }));
+    wrap.appendChild(titulo(`${esc(nombreHoja || '')} - Pagos del mes ${String(M).padStart(2, '0')}/${Y} por pasajero (${listado.length})`));
+    if (!listado.length) {
+      wrap.appendChild(el('div', 'empty-note', 'No hay pagos registrados en el mes analizado.'));
+    } else {
+      const scrollB = el('div', 'table-scroll');
+      const tB = el('table', 'ledger');
+      tB.innerHTML = `<thead><tr><th>Código</th><th>Cliente</th><th>Pago/s del mes</th><th class="num">Total del mes</th></tr></thead>`;
+      const tbB = el('tbody');
+      listado.forEach(o => {
+        o.pagos.sort((x, y) => x.f - y.f);
+        const det = o.pagos.map(p => `${fmtF(p.f)}: ${esc(fmtNum(p.m, moneda))}`).join(' · ');
+        const tr = el('tr');
+        tr.innerHTML = `<td>${esc(o.cod)}</td><td>${esc(o.nombre)}</td><td>${det}</td><td class="num">${esc(fmtNum(o.total, moneda))}</td>`;
+        tbB.appendChild(tr);
+      });
+      const trT = el('tr');
+      trT.innerHTML = `<td colspan="3"><strong>Total</strong></td><td class="num"><strong>${esc(fmtNum(listado.reduce((a, o) => a + o.total, 0), moneda))}</strong></td>`;
+      tbB.appendChild(trT);
+      tB.appendChild(tbB); scrollB.appendChild(tB); wrap.appendChild(scrollB);
+    }
 
     return wrap;
   }
