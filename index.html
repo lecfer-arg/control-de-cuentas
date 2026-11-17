@@ -367,7 +367,7 @@
 <body>
 
 <div class="topbar">
-  <span class="version-badge">V43</span>
+  <span class="version-badge">V44</span>
   <div class="topbar-inner">
     <div class="brand-mark">
       <div class="glyph">CC</div>
@@ -1740,8 +1740,10 @@
         );
         // Los que NO tienen CAU en el viaje actual (columna con ✗) van arriba para verse
         // y corregirse; al cargar el CAU vuelven a su lugar habitual. Orden estable.
-        const sinCau = activosCorrectos.filter(r => !((r.cauMonto || 0) > 0));
-        const conCau = activosCorrectos.filter(r => (r.cauMonto || 0) > 0);
+        // También arriba: los que no tienen ningún pago y los que están sin grupo.
+        const aCorregir = r => !((r.cauMonto || 0) > 0) || r.estado === 'SIN PAGOS' || !((r.totalPagadoActivo || 0) > 0) || r.destino === 'Sin grupo';
+        const sinCau = activosCorrectos.filter(aCorregir);
+        const conCau = activosCorrectos.filter(r => !aCorregir(r));
         activosCorrectos = sinCau.concat(conCau);
       }
       tituloActivos.textContent = `Detalle general de clientes activos (${activosCorrectos.length})`;
@@ -1910,9 +1912,11 @@
       const o = porCli.get(k); o.total += p.m; o.pagos.push(p);
     });
     const listado = [...porCli.values()].sort((a, b) => (b.total - a.total) || String(a.cod).localeCompare(String(b.cod), undefined, { numeric: true }));
-    wrap.appendChild(titulo(`${esc(nombreHoja || '')} - Pagos del mes ${String(M).padStart(2, '0')}/${Y} por pasajero (${listado.length})`));
+    const pagosBox = el('div', 'pagos-mes-box');
+    pagosBox.style.cssText = 'margin-top:26px; padding:14px 16px 16px; background:#E8F0F8; border:1px solid #9DB8D3; border-left:6px solid #2C5F8A; border-radius:3px;';
+    pagosBox.appendChild(titulo(`${esc(nombreHoja || '')} - Pagos del mes ${String(M).padStart(2, '0')}/${Y} por pasajero (${listado.length})`));
     if (!listado.length) {
-      wrap.appendChild(el('div', 'empty-note', 'No hay pagos registrados en el mes analizado.'));
+      pagosBox.appendChild(el('div', 'empty-note', 'No hay pagos registrados en el mes analizado.'));
     } else {
       const scrollB = el('div', 'table-scroll');
       const tB = el('table', 'ledger');
@@ -1928,8 +1932,11 @@
       const trT = el('tr');
       trT.innerHTML = `<td colspan="3"><strong>Total</strong></td><td class="num"><strong>${esc(fmtNum(listado.reduce((a, o) => a + o.total, 0), moneda))}</strong></td>`;
       tbB.appendChild(trT);
-      tB.appendChild(tbB); scrollB.appendChild(tB); wrap.appendChild(scrollB);
+      tB.appendChild(tbB); scrollB.appendChild(tB); pagosBox.appendChild(scrollB);
     }
+
+    const tt = pagosBox.firstChild; if (tt) { tt.style.color = '#1F4568'; tt.style.borderBottomColor = '#2C5F8A'; }
+    wrap.appendChild(pagosBox);
 
     return wrap;
   }
