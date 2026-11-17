@@ -367,7 +367,7 @@
 <body>
 
 <div class="topbar">
-  <span class="version-badge">V44</span>
+  <span class="version-badge">V45</span>
   <div class="topbar-inner">
     <div class="brand-mark">
       <div class="glyph">CC</div>
@@ -401,7 +401,10 @@
         <input type="month" id="cfg-lasteval" />
         <div class="field-hint">Hasta qué mes se evalúa el cumplimiento de la cuota mínima.</div>
       </div>
-      <button class="btn btn-primary btn-small" id="btn-actualizar" type="button" disabled>⟳ Actualizar</button>
+      <div style="display:flex; flex-direction:column; gap:8px; align-items:stretch;">
+        <button class="btn btn-primary btn-small" id="btn-bajar-json" type="button">⬇ BAJAR JSON</button>
+        <button class="btn btn-primary btn-small" id="btn-actualizar" type="button" disabled>⟳ Actualizar</button>
+      </div>
     </div>
     <div id="carga-estado" style="display:none; margin:0 22px 16px; padding:10px 14px; border-radius:3px; font-size:13px;"></div>
   </div>
@@ -2018,6 +2021,72 @@
 
     await cargarDatosDeProvincia(prov);
   });
+
+
+  // ---------- BAJAR JSON: clientes de todas las provincias ----------
+  // Formato: { "<nro de documento>": { "codigo": "<código de cliente>", "desc": "<grupo empresario>" } }
+  // El número de documento se toma de una columna de las pestañas de cuentas (NRO_DOC / DNI / DOCUMENTO...).
+  // Si todavía no existe esa columna, el cliente se exporta con la clave "SIN_DNI_<código>".
+  async function generarClientesJson() {
+    const btn = $('btn-bajar-json');
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    const provs = ['TUCUMAN', 'SALTA', 'JUJUY', 'CATAMARCA'];
+    const reDoc = /^(NRO_?DOC\w*|N_?DOC\w*|NUM_?DOC\w*|DNI|DOCUMENTO|NRO_?DNI|CUIT|CUIL)$/i;
+    const clientes = new Map(); // código -> { codigo, desc, dni }
+    const fallas = [];
+    let hayColDoc = false;
+    for (let i = 0; i < provs.length; i++) {
+      const prov = provs[i];
+      btn.innerHTML = `<span class="spinner"></span> ${prov} (${i + 1}/${provs.length})…`;
+      try {
+        const all = await gsFetchSheetTitles(GS_SHEET_IDS[prov]);
+        const cuentas = all.filter(t => !/^SL\s/i.test(t.trim())).sort();
+        const values = await gsFetchValuesBatch(GS_SHEET_IDS[prov], cuentas);
+        cuentas.forEach(name => {
+          const aoa = values[name] || [];
+          if (aoa.length < 2) return;
+          const hdr = aoa[0].map(h => String(h || '').trim().toUpperCase().replace(/[\s.]+/g, '_'));
+          const iCli = hdr.indexOf('COD_CLI'), iNom = hdr.indexOf('NOMBRE_GRU');
+          const iDoc = hdr.findIndex(h => reDoc.test(h));
+          if (iCli < 0 || iNom < 0) return;
+          if (iDoc >= 0) hayColDoc = true;
+          aoa.slice(1).forEach(row => {
+            const cod = row[iCli];
+            if (cod === undefined || cod === null || String(cod).trim() === '') return;
+            const k = String(cod).trim();
+            const prev = clientes.get(k) || {};
+            const dniRaw = iDoc >= 0 ? row[iDoc] : '';
+            const dni = String(dniRaw == null ? '' : dniRaw).replace(/\D/g, '');
+            const grupo = String(row[iNom] || '').trim();
+            // pestañas ordenadas por año: la última (más nueva) pisa el grupo
+            clientes.set(k, { codigo: k, desc: grupo || prev.desc || '', dni: dni || prev.dni || '' });
+          });
+        });
+      } catch (err) { fallas.push(`${prov}: ${err.message}`); }
+    }
+    const out = {};
+    let sinDni = 0;
+    [...clientes.values()].sort((a, b) => Number(a.codigo) - Number(b.codigo)).forEach(c => {
+      let key = c.dni;
+      if (!key) { sinDni++; key = `SIN_DNI_${c.codigo}`; }
+      out[key] = { codigo: c.codigo, desc: c.desc };
+    });
+    const blob = new Blob([JSON.stringify(out)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'clientes.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    btn.innerHTML = original; btn.disabled = false;
+    const total = Object.keys(out).length;
+    let msg = `✓ clientes.json descargado — ${total} clientes de ${provs.length - fallas.length} provincia(s).`;
+    if (!hayColDoc) msg += ' ⚠ Las planillas no tienen columna de documento todavía: todos los clientes salieron como SIN_DNI_<código>.';
+    else if (sinDni) msg += ` ⚠ ${sinDni} cliente(s) sin documento (clave SIN_DNI_<código>).`;
+    if (fallas.length) msg += ' ⚠ No se pudo leer: ' + fallas.join(' | ');
+    setCargaEstado(msg, (fallas.length || !hayColDoc || sinDni) ? 'error' : 'ok');
+  }
+  $('btn-bajar-json').addEventListener('click', generarClientesJson);
 
   $('btn-actualizar').addEventListener('click', async () => {
     if (state.provinciaActual) await cargarDatosDeProvincia(state.provinciaActual);
