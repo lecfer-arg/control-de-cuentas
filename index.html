@@ -243,6 +243,31 @@
   button.btn-small { padding: 6px 10px; font-size: 12px; }
   button.btn-danger { background: none; color: var(--stamp-red); border: 1px solid rgba(162,59,46,0.4); }
 
+  .cli-link { color: var(--pine-dark, #1E6F5C); cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; font-weight: 600; }
+  .cli-link:hover { text-decoration: underline; }
+  .det-overlay { position: fixed; inset: 0; background: rgba(20,24,28,0.45); z-index: 1000; display: flex; justify-content: flex-end; }
+  .det-panel { width: min(820px, 100vw); height: 100%; background: #FBF8EF; box-shadow: -8px 0 28px rgba(0,0,0,0.3); display: flex; flex-direction: column; animation: detIn .18s ease-out; }
+  @keyframes detIn { from { transform: translateX(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+  .det-head { padding: 16px 20px 12px; border-bottom: 2px solid #D9CFB4; background: #F1E9D2; position: relative; }
+  .det-head h2 { margin: 0 34px 2px 0; font-family: "IBM Plex Serif", serif; font-size: 19px; }
+  .det-close { position: absolute; top: 10px; right: 14px; border: none; background: none; font-size: 22px; cursor: pointer; color: #555; }
+  .det-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .det-chip { background: #fff; border: 1px solid #C9BC97; border-radius: 12px; padding: 2px 10px; font-size: 12px; }
+  .det-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 12px 20px; }
+  .det-kpi { background: #fff; border: 1px solid #D9CFB4; border-radius: 3px; padding: 8px 12px; }
+  .det-kpi small { display: block; color: #777; text-transform: uppercase; font-size: 10.5px; letter-spacing: .04em; }
+  .det-kpi b { font-size: 18px; font-family: "IBM Plex Mono", monospace; }
+  .det-tools { padding: 0 20px 8px; display: flex; gap: 8px; align-items: center; font-size: 12.5px; }
+  .det-body { flex: 1; overflow: auto; padding: 0 20px 20px; }
+  .det-body table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .det-body th { position: sticky; top: 0; background: #F1E9D2; text-align: left; padding: 6px 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+  .det-body td { padding: 5px 8px; border-bottom: 1px solid #E6DEC6; vertical-align: top; }
+  .det-body td.num, .det-body th.num { text-align: right; font-family: "IBM Plex Mono", monospace; white-space: nowrap; }
+  .tc { display: inline-block; min-width: 38px; text-align: center; padding: 1px 6px; border-radius: 3px; font-weight: 700; font-size: 11px; background: #E6E1D2; }
+  .tc-REC, .tc-RSC { background: #CFE8D8; color: #14532D; }
+  .tc-CAU, .tc-DIN { background: #E3D3F0; color: #4A1D6B; }
+  .tc-NOV, .tc-RNV, .tc-REI { background: #F6D9B8; color: #7A3E00; }
+  .tc-FAC, .tc-CIN, .tc-CUO { background: #D6E4F2; color: #1F4568; }
   #btn-analizar { display: none !important; }
   .btn-analizar {
     display: block; width: 100%;
@@ -367,7 +392,7 @@
 <body>
 
 <div class="topbar">
-  <span class="version-badge">V45</span>
+  <span class="version-badge">V46</span>
   <div class="topbar-inner">
     <div class="brand-mark">
       <div class="glyph">CC</div>
@@ -1124,6 +1149,7 @@
         return {
           COD_CLI: get(row, 'COD_CLI'), COD_GRU: get(row, 'COD_GRU'), RAZON_SOC: get(row, 'RAZON_SOC'),
           FECHA_EMIS: LedgerLogic.parseDate(get(row, 'FECHA_EMIS')), T_COMP: get(row, 'T_COMP'),
+          N_COMP: get(row, 'N_COMP'), LEYENDA: get(row, 'LEYENDA'), ESTADO_COMP: get(row, 'ESTADO'),
           DEBE: typeof debeRaw === 'string' ? (LedgerLogic.toF(debeRaw) || 0) : (debeRaw || 0),
           HABER: typeof haberRaw === 'string' ? (LedgerLogic.toF(haberRaw) || 0) : (haberRaw || 0),
           SALDO: typeof saldoRaw === 'string' ? (LedgerLogic.toF(saldoRaw) || 0) : (saldoRaw || 0),
@@ -1471,7 +1497,10 @@
             const di = getDestinoInfo(codGruToNombre[String(row.COD_GRU).trim()]);
             recibosMes.push({ f, m, destino: di.label, cod: row.COD_CLI, nombre: row.RAZON_SOC });
           });
-          results[s.name] = { results: res, counts, validation, moneda, recibosMes };
+          // Comprobantes por cliente (en el orden de la planilla) para el detalle de cuenta
+          const rowsByCli = {};
+          (s.rows || []).forEach(row => { const k = String(row.COD_CLI).trim(); (rowsByCli[k] = rowsByCli[k] || []).push(row); });
+          results[s.name] = { results: res, counts, validation, moneda, recibosMes, rowsByCli };
         });
 
         state.results = results;
@@ -1805,12 +1834,13 @@
           if (r.estado === 'GANADOR SORTEO') obsSimple = 'Ganador de Sorteo';
           else if (r.estado === 'SIN PAGOS') obsSimple = 'Cliente sin pagos';
           else if (r.estado === 'DEUDA SALDADA') obsSimple = 'Deuda saldada';
-          tr.innerHTML = `<td>${r.codGru}</td><td>${r.colegio || '—'}</td><td>${r.destino || '—'}</td><td>${r.cod}</td><td>${r.nombre}</td>
+          tr.innerHTML = `<td>${r.codGru}</td><td>${r.colegio || '—'}</td><td>${r.destino || '—'}</td><td><a class="cli-link" data-cod="${r.cod}">${r.cod}</a></td><td><a class="cli-link" data-cod="${r.cod}">${r.nombre}</a></td>
             <td class="num">${r.viajes}</td>
             <td>${r.ultimoPago ? fmtDate(r.ultimoPago) : '—'}</td>
             <td style="text-align:center;">${(r.cauMonto || 0) > 0 ? '✓' : '✗'}</td>
             <td style="text-align:center;">${r.tieneFacActivo ? '✓' : '✗'}</td>
             <td>${obsSimple}</td>`;
+          tr.querySelectorAll('.cli-link').forEach(a => a.addEventListener('click', () => abrirDetalleCliente(r, data, n)));
           tbodyAct.appendChild(tr);
         });
         tableAct.appendChild(tbodyAct);
@@ -1854,6 +1884,69 @@
     container.appendChild(dlWrap);
   }
 
+
+
+  // ---------- Detalle de cuenta de un cliente (panel lateral) ----------
+  function abrirDetalleCliente(r, data, nombreHoja) {
+    const esc = (t) => String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const moneda = data.moneda;
+    const filas = ((data.rowsByCli || {})[String(r.cod).trim()] || []).slice();
+    filas.sort((a, b) => (a.FECHA_EMIS - b.FECHA_EMIS)); // estable: respeta el orden de la planilla en el mismo día
+    const anio = (String(nombreHoja).match(/20\d\d/) || ['—'])[0];
+    const ultima = filas.length ? filas[filas.length - 1] : null;
+    const totD = filas.reduce((a, x) => a + (x.DEBE || 0), 0), totH = filas.reduce((a, x) => a + (x.HABER || 0), 0);
+    const saldoActual = ultima && isFinite(ultima.SALDO) && ultima.SALDO !== 0 ? ultima.SALDO : (totD - totH);
+    const fmtM = (v) => (v ? esc(fmtNum(v, moneda)) : '');
+
+    const ov = document.createElement('div');
+    ov.className = 'det-overlay';
+    ov.innerHTML = `<div class="det-panel" role="dialog" aria-modal="true">
+      <div class="det-head">
+        <button class="det-close" type="button" aria-label="Cerrar">✕</button>
+        <h2>${esc(r.nombre)}</h2>
+        <div style="font-size:13px; color:#555;">Cliente ${esc(r.cod)} · Grupo ${esc(r.codGru)}${r.nombreGru ? ' — ' + esc(r.nombreGru) : ''}</div>
+        <div class="det-chips">
+          <span class="det-chip"><b>Colegio:</b> ${esc(r.colegio || '—')}</span>
+          <span class="det-chip"><b>Destino:</b> ${esc(r.destino || '—')}</span>
+          <span class="det-chip"><b>Año de viaje:</b> ${esc(anio)}</span>
+          <span class="det-chip"><b>Moneda:</b> ${moneda === 'USD' ? 'USD (dólares)' : 'Pesos'}</span>
+          <span class="det-chip"><b>Estado:</b> ${esc(r.estado || '—')}</span>
+        </div>
+      </div>
+      <div class="det-kpis">
+        <div class="det-kpi"><small>Saldo actual</small><b>${esc(fmtNum(saldoActual, moneda))}</b></div>
+        <div class="det-kpi"><small>Total debe</small><b>${esc(fmtNum(totD, moneda))}</b></div>
+        <div class="det-kpi"><small>Total haber (pagado)</small><b>${esc(fmtNum(totH, moneda))}</b></div>
+      </div>
+      <div class="det-tools">
+        <label><input type="checkbox" id="det-rev" checked> Más recientes primero</label>
+        <select id="det-tipo" style="width:auto; padding:4px 8px; font-size:12.5px;"><option value="">Todos los comprobantes</option></select>
+        <span style="margin-left:auto; color:#777;">${filas.length} comprobantes</span>
+      </div>
+      <div class="det-body"><table><thead><tr><th>Fecha</th><th>Tipo</th><th>N° comp.</th><th class="num">Debe</th><th class="num">Haber</th><th>Leyenda</th></tr></thead><tbody id="det-tbody"></tbody></table></div>
+    </div>`;
+    document.body.appendChild(ov);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const cerrar = () => { ov.remove(); document.body.style.overflow = prevOverflow; document.removeEventListener('keydown', onKey); };
+    const onKey = (e) => { if (e.key === 'Escape') cerrar(); };
+    document.addEventListener('keydown', onKey);
+    ov.addEventListener('click', (e) => { if (e.target === ov) cerrar(); });
+    ov.querySelector('.det-close').addEventListener('click', cerrar);
+
+    const selTipo = ov.querySelector('#det-tipo'), chkRev = ov.querySelector('#det-rev'), tbody = ov.querySelector('#det-tbody');
+    [...new Set(filas.map(x => String(x.T_COMP).trim()))].sort().forEach(t => { const o = document.createElement('option'); o.value = t; o.textContent = t; selTipo.appendChild(o); });
+    function pintar() {
+      let l = filas.filter(x => !selTipo.value || String(x.T_COMP).trim() === selTipo.value);
+      if (chkRev.checked) l = l.slice().reverse();
+      tbody.innerHTML = l.map(x => {
+        const t = esc(String(x.T_COMP).trim());
+        return `<tr><td>${esc(fmtDate(x.FECHA_EMIS))}</td><td><span class="tc tc-${t.replace(/[^A-Z]/gi, '')}">${t}</span></td><td>${esc(x.N_COMP == null ? '' : x.N_COMP)}</td><td class="num">${fmtM(x.DEBE)}</td><td class="num">${fmtM(x.HABER)}</td><td>${esc(x.LEYENDA || '')}</td></tr>`;
+      }).join('') || '<tr><td colspan="6" style="text-align:center; color:#777; padding:16px;">Sin comprobantes.</td></tr>';
+    }
+    selTipo.addEventListener('change', pintar); chkRev.addEventListener('change', pintar);
+    pintar();
+  }
 
   // ---------- Dashboard por pestaña ----------
   function buildDashboard(data, nombreHoja) {
