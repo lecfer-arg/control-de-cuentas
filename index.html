@@ -243,6 +243,8 @@
   button.btn-small { padding: 6px 10px; font-size: 12px; }
   button.btn-danger { background: none; color: var(--stamp-red); border: 1px solid rgba(162,59,46,0.4); }
 
+  .pagos-mes-box table thead th { background: #C5D8EC !important; color: #1F4568 !important; border-bottom: 2px solid #2C5F8A !important; }
+  .pagos-mes-box table tbody td { border-bottom-color: #C9DAEA !important; }
   .cli-link { color: var(--pine-dark, #1E6F5C); cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; font-weight: 600; }
   .cli-link:hover { text-decoration: underline; }
   .det-overlay { position: fixed; inset: 0; background: rgba(20,24,28,0.45); z-index: 1000; display: flex; justify-content: flex-end; }
@@ -392,7 +394,7 @@
 <body>
 
 <div class="topbar">
-  <span class="version-badge">V46</span>
+  <span class="version-badge">V47</span>
   <div class="topbar-inner">
     <div class="brand-mark">
       <div class="glyph">CC</div>
@@ -1805,6 +1807,9 @@
       buscadorWrap.appendChild(cajaBusqueda);
       tituloBarra.appendChild(buscadorWrap);
       activosWrap.appendChild(tituloBarra);
+      const bajadaActivos = el('div', 'field-hint', 'Hacé clic en algún cliente y podrás ver el detalle de su cuenta');
+      bajadaActivos.style.cssText = 'margin:-4px 0 10px;';
+      activosWrap.appendChild(bajadaActivos);
 
       const tablaContenedor = el('div');
       activosWrap.appendChild(tablaContenedor);
@@ -1919,7 +1924,7 @@
         <div class="det-kpi"><small>Total haber (pagado)</small><b>${esc(fmtNum(totH, moneda))}</b></div>
       </div>
       <div class="det-tools">
-        <label><input type="checkbox" id="det-rev" checked> Más recientes primero</label>
+        <label><input type="checkbox" id="det-rev"> Más recientes primero</label>
         <select id="det-tipo" style="width:auto; padding:4px 8px; font-size:12.5px;"><option value="">Todos los comprobantes</option></select>
         <span style="margin-left:auto; color:#777;">${filas.length} comprobantes</span>
       </div>
