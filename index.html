@@ -255,7 +255,7 @@
   .det-close { position: absolute; top: 10px; right: 14px; border: none; background: none; font-size: 22px; cursor: pointer; color: #555; }
   .det-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
   .det-chip { background: #fff; border: 1px solid #C9BC97; border-radius: 12px; padding: 2px 10px; font-size: 12px; }
-  .det-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 12px 20px; }
+  .det-kpis { display: grid; grid-template-columns: 1fr; gap: 10px; padding: 12px 20px; }
   .det-kpi { background: #fff; border: 1px solid #D9CFB4; border-radius: 3px; padding: 8px 12px; }
   .det-kpi small { display: block; color: #777; text-transform: uppercase; font-size: 10.5px; letter-spacing: .04em; }
   .det-kpi b { font-size: 18px; font-family: "IBM Plex Mono", monospace; }
@@ -395,7 +395,7 @@
 <body>
 
 <div class="topbar">
-  <span class="version-badge">V49</span>
+  <span class="version-badge">V50</span>
   <div class="topbar-inner">
     <div class="brand-mark">
       <div class="glyph">CC</div>
@@ -1921,8 +1921,6 @@
       </div>
       <div class="det-kpis">
         <div class="det-kpi"><small>Saldo actual</small><b>${esc(fmtNum(saldoActual, moneda))}</b></div>
-        <div class="det-kpi"><small>Total debe</small><b>${esc(fmtNum(totD, moneda))}</b></div>
-        <div class="det-kpi"><small>Total haber (pagado)</small><b>${esc(fmtNum(totH, moneda))}</b></div>
       </div>
       <div class="det-tools">
         <label><input type="checkbox" id="det-rev"> Más recientes primero</label>
