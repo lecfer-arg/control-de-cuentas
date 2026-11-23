@@ -395,7 +395,7 @@
 <body>
 
 <div class="topbar">
-  <span class="version-badge">V48</span>
+  <span class="version-badge">V49</span>
   <div class="topbar-inner">
     <div class="brand-mark">
       <div class="glyph">CC</div>
@@ -1929,7 +1929,7 @@
         <select id="det-tipo" style="width:auto; padding:4px 8px; font-size:12.5px;"><option value="">Todos los comprobantes</option></select>
         <span style="margin-left:auto; color:#777;">${filas.length} comprobantes</span>
       </div>
-      <div class="det-body"><table><thead><tr><th>Fecha</th><th>Tipo</th><th>N° comp.</th><th class="num">Debe</th><th class="num">Haber</th><th>Leyenda</th></tr></thead><tbody id="det-tbody"></tbody></table></div>
+      <div class="det-body"><table><thead><tr><th>Fecha</th><th>Tipo</th><th>N° comp.</th><th class="num">Debe</th><th class="num">Haber</th><th class="num">Saldo</th><th>Leyenda</th></tr></thead><tbody id="det-tbody"></tbody></table></div>
       <div class="det-foot">ESTE DETALLE ES UNA GUIA RAPIDA DEL ESTADO DEL CLIENTE. PUEDE TENER ERRORES. SI EXISTE ALGUNA DUDA O VES ALGO INCORRECTO, POR FAVOR, CHEQUEAR EN TANGO</div>
     </div>`;
     document.body.appendChild(ov);
@@ -1948,8 +1948,8 @@
       if (chkRev.checked) l = l.slice().reverse();
       tbody.innerHTML = l.map(x => {
         const t = esc(String(x.T_COMP).trim());
-        return `<tr><td>${esc(fmtDate(x.FECHA_EMIS))}</td><td><span class="tc tc-${t.replace(/[^A-Z]/gi, '')}">${t}</span></td><td>${esc(x.N_COMP == null ? '' : x.N_COMP)}</td><td class="num">${fmtM(x.DEBE)}</td><td class="num">${fmtM(x.HABER)}</td><td>${esc(x.LEYENDA || '')}</td></tr>`;
-      }).join('') || '<tr><td colspan="6" style="text-align:center; color:#777; padding:16px;">Sin comprobantes.</td></tr>';
+        return `<tr><td>${esc(fmtDate(x.FECHA_EMIS))}</td><td><span class="tc tc-${t.replace(/[^A-Z]/gi, '')}">${t}</span></td><td>${esc(x.N_COMP == null ? '' : x.N_COMP)}</td><td class="num">${fmtM(x.DEBE)}</td><td class="num">${fmtM(x.HABER)}</td><td class="num">${esc(fmtNum(x.SALDO || 0, moneda))}</td><td>${esc(x.LEYENDA || '')}</td></tr>`;
+      }).join('') || '<tr><td colspan="7" style="text-align:center; color:#777; padding:16px;">Sin comprobantes.</td></tr>';
     }
     selTipo.addEventListener('change', pintar); chkRev.addEventListener('change', pintar);
     pintar();
